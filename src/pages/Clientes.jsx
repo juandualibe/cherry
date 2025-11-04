@@ -21,6 +21,13 @@ const obtenerFechaLocal = () => {
   return `${año}-${mes}-${dia}`;
 };
 
+// --- Función para formatear fecha sin conversión de zona horaria ---
+const formatearFechaLocal = (fechaString) => {
+  if (!fechaString) return '';
+  const [año, mes, dia] = fechaString.split('T')[0].split('-');
+  return `${dia}/${mes}/${año}`;
+};
+
 function Clientes() {
   // Estados de la app
   const [clientes, setClientes] = useState([]);
@@ -642,9 +649,7 @@ function Clientes() {
                     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                     .map((deuda) => (
                       <tr key={deuda._id}>
-                        <td>
-                          {new Date(deuda.fecha).toLocaleDateString("es-AR")}
-                        </td>
+                        <td>{formatearFechaLocal(deuda.fecha)}</td>
                         <td>${deuda.monto.toLocaleString("es-AR")}</td>
                         <td className="tabla-acciones">
                           <button
