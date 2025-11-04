@@ -8,7 +8,8 @@ import {
   eliminarCliente,
   obtenerDeudasCliente,
   agregarDeuda,
-  eliminarDeuda
+  eliminarDeuda,
+  editarDeuda  // ← AGREGÁ ESTA LÍNEA
 } from '../services/api';
 
 // --- Función para obtener fecha local (sin UTC) ---
@@ -190,31 +191,31 @@ function Clientes() {
   };
 
   const handleGuardarDeudaEditada = async (e) => {
-    e.preventDefault();
-    const monto = parseFloat(itemEditando.monto);
-    if (!monto || monto <= 0) {
-      alert("El Monto no puede estar vacío.");
-      return;
-    }
+  e.preventDefault();
+  const monto = parseFloat(itemEditando.monto);
+  if (!monto || monto <= 0) {
+    alert("El Monto no puede estar vacío.");
+    return;
+  }
 
-    try {
-      // Por ahora solo actualizamos localmente (necesitarías agregar editarDeuda a api.js)
-      const deudasActualizadas = deudas.map(d => 
-        d._id === itemEditando._id 
-          ? { ...itemEditando, monto } 
-          : d
-      );
-      
-      setDeudas(deudasActualizadas);
-      handleCerrarModales();
-      
-      // TODO: Implementar editarDeuda en el backend
-      alert('⚠️ Edición guardada localmente. Necesitas recargar para ver cambios persistentes.');
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error al editar deuda');
-    }
-  };
+  try {
+    // Importá editarDeuda al inicio del archivo
+    await editarDeuda(itemEditando._id, itemEditando.fecha, monto);
+    
+    const deudasActualizadas = deudas.map(d => 
+      d._id === itemEditando._id 
+        ? { ...itemEditando, monto } 
+        : d
+    );
+    
+    setDeudas(deudasActualizadas);
+    handleCerrarModales();
+    alert('✅ Deuda editada correctamente');
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al editar deuda');
+  }
+};
 
   const handleExportarDeudas = () => {
     const formatearFecha = (fechaString) => {

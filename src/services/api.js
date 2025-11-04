@@ -52,6 +52,16 @@ export const eliminarDeuda = async (deudaId) => {
   return await response.json();
 };
 
+export const editarDeuda = async (deudaId, fecha, monto) => {
+  const response = await fetch(`${API_URL}/clientes/deudas/${deudaId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, monto }),
+  });
+  if (!response.ok) throw new Error('Error al editar deuda');
+  return await response.json();
+};
+
 // ==================== PROVEEDORES ====================
 
 export const obtenerProveedores = async () => {
