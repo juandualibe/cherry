@@ -2,16 +2,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-
-// --- Funciones para interactuar con LocalStorage ---
-const cargarDatos = (key) => {
-  const datosGuardados = localStorage.getItem(key);
-  return datosGuardados ? JSON.parse(datosGuardados) : [];
-};
-
-const guardarDatos = (key, datos) => {
-  localStorage.setItem(key, JSON.stringify(datos));
-};
+import {
+  obtenerMeses,
+  crearMes,
+  eliminarMes,
+  obtenerVentasMes,
+  agregarVenta,
+  editarVenta,
+  eliminarVenta,
+  obtenerGastosMes,
+  agregarGasto,
+  editarGasto,
+  eliminarGasto
+} from '../services/api';
 
 // --- Función para obtener fecha local ---
 const obtenerFechaLocal = () => {
@@ -20,6 +23,13 @@ const obtenerFechaLocal = () => {
   const mes = String(ahora.getMonth() + 1).padStart(2, '0');
   const dia = String(ahora.getDate()).padStart(2, '0');
   return `${año}-${mes}-${dia}`;
+};
+
+// --- Función para formatear fecha sin conversión de zona horaria ---
+const formatearFechaLocal = (fechaString) => {
+  if (!fechaString) return '';
+  const [año, mes, dia] = fechaString.split('T')[0].split('-');
+  return `${dia}/${mes}/${año}`;
 };
 
 // --- Función para obtener mes/año actual ---
@@ -33,7 +43,8 @@ const obtenerMesActual = () => {
 // --- Función para obtener nombre del día de la semana ---
 const obtenerDiaSemana = (fechaString) => {
   const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const fecha = new Date(fechaString + 'T00:00:00');
+  const [año, mes, dia] = fechaString.split('T')[0].split('-');
+  const fecha = new Date(año, mes - 1, dia);
   return dias[fecha.getDay()];
 };
 
@@ -65,10 +76,11 @@ const GASTOS_FIJOS_PREDEFINIDOS = [
 
 
 function Verduleria() {
-  const [meses, setMeses] = useState(() => cargarDatos('verduleriaMeses'));
+  const [meses, setMeses] = useState([]);
   const [mesSeleccionado, setMesSeleccionado] = useState(null);
-  const [ventas, setVentas] = useState(() => cargarDatos('verduleriaVentas'));
-  const [gastosFijos, setGastosFijos] = useState(() => cargarDatos('verduleriaGastosFijos'));
+  const [ventas, setVentas] = useState([]);
+  const [gastosFijos, setGastosFijos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Estados para formularios
   const [nombreNuevoMes, setNombreNuevoMes] = useState(obtenerMesActual());
@@ -85,61 +97,102 @@ function Verduleria() {
 
   const mouseDownInsideModal = useRef(false);
 
-  // --- Efectos para Guardar Datos ---
-  useEffect(() => { guardarDatos('verduleriaMeses', meses); }, [meses]);
-  useEffect(() => { guardarDatos('verduleriaVentas', ventas); }, [ventas]);
-  useEffect(() => { guardarDatos('verduleriaGastosFijos', gastosFijos); }, [gastosFijos]);
+  // Cargar meses al montar el componente
+  useEffect(() => {
+    cargarMeses();
+  }, []);
+
+  const cargarMeses = async () => {
+    try {
+      setLoading(true);
+      const mesesData = await obtenerMeses();
+      setMeses(mesesData);
+    } catch (error) {
+      console.error('Error cargando meses:', error);
+      alert('Error al cargar los datos. ¿Está el backend funcionando?');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarDatosMes = async (mesId) => {
+    try {
+      const ventasData = await obtenerVentasMes(mesId);
+      const gastosData = await obtenerGastosMes(mesId);
+      setVentas(ventasData);
+      setGastosFijos(gastosData);
+    } catch (error) {
+      console.error('Error cargando datos del mes:', error);
+    }
+  };
 
   // --- Funciones de Lógica ---
 
-  const handleCrearMes = (e) => {
+  const handleCrearMes = async (e) => {
     e.preventDefault();
     if (!nombreNuevoMes) return;
     
-    const mesExiste = meses.find(m => m.id === nombreNuevoMes);
+    const mesExiste = meses.find(m => m.mesId === nombreNuevoMes);
     if (mesExiste) {
       alert('Este mes ya existe');
       return;
     }
 
-    const nuevoMes = { id: nombreNuevoMes, nombre: formatearMesTexto(nombreNuevoMes) };
-    setMeses([...meses, nuevoMes]);
-    setMesSeleccionado(nuevoMes);
-    
-    // Crear gastos fijos por defecto para este mes
-    const nuevosGastosFijos = GASTOS_FIJOS_PREDEFINIDOS.map((concepto, index) => ({
-      id: Date.now() + index,
-      mesId: nombreNuevoMes,
-      concepto: concepto,
-      total: 0,
-      porcentaje: 0,
-      verduleria: 0
-    }));
-    setGastosFijos([...gastosFijos, ...nuevosGastosFijos]);
+    try {
+      const nuevoMes = await crearMes(nombreNuevoMes, formatearMesTexto(nombreNuevoMes));
+      setMeses([...meses, nuevoMes]);
+      setMesSeleccionado(nuevoMes);
+      
+      // Crear gastos fijos por defecto para este mes
+      for (const concepto of GASTOS_FIJOS_PREDEFINIDOS) {
+        await agregarGasto(nuevoMes.mesId, {
+          concepto: concepto,
+          total: 0,
+          porcentaje: 0,
+          verduleria: 0
+        });
+      }
+      
+      // Recargar gastos
+      const gastosData = await obtenerGastosMes(nuevoMes.mesId);
+      setGastosFijos(gastosData);
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al crear mes');
+    }
   };
 
-  const handleEliminarMes = (mesId) => {
+  const handleEliminarMes = async (mesId) => {
     const confirmar = window.confirm("¿Estás seguro de eliminar este mes? Se borrarán TODAS las ventas y gastos asociados.");
     if (!confirmar) return;
     
-    setMeses(meses.filter(m => m.id !== mesId));
-    setVentas(ventas.filter(v => v.mesId !== mesId));
-    setGastosFijos(gastosFijos.filter(g => g.mesId !== mesId));
-    
-    if (mesSeleccionado && mesSeleccionado.id === mesId) {
-      setMesSeleccionado(null);
+    try {
+      await eliminarMes(mesId);
+      setMeses(meses.filter(m => m.mesId !== mesId));
+      
+      if (mesSeleccionado && mesSeleccionado.mesId === mesId) {
+        setMesSeleccionado(null);
+        setVentas([]);
+        setGastosFijos([]);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar mes');
     }
   };
 
-  const handleSeleccionarMes = (mes) => {
-    if (mesSeleccionado && mesSeleccionado.id === mes.id) {
+  const handleSeleccionarMes = async (mes) => {
+    if (mesSeleccionado && mesSeleccionado.mesId === mes.mesId) {
       setMesSeleccionado(null);
+      setVentas([]);
+      setGastosFijos([]);
     } else {
       setMesSeleccionado(mes);
+      await cargarDatosMes(mes.mesId);
     }
   };
 
-  const handleAgregarVenta = (e) => {
+  const handleAgregarVenta = async (e) => {
     e.preventDefault();
     const costo = parseFloat(costoMerc);
     const gastos = parseFloat(gastosVenta);
@@ -152,28 +205,38 @@ function Verduleria() {
 
     const margen = venta - costo - gastos;
     
-    const nuevaVenta = {
-      id: Date.now(),
-      mesId: mesSeleccionado.id,
-      fecha: fechaNuevaVenta,
-      diaSemana: obtenerDiaSemana(fechaNuevaVenta),
-      costoMercaderia: costo,
-      gastos: gastos,
-      venta: venta,
-      margen: margen
-    };
+    try {
+      const nuevaVenta = await agregarVenta(mesSeleccionado.mesId, {
+        fecha: fechaNuevaVenta,
+        diaSemana: obtenerDiaSemana(fechaNuevaVenta),
+        costoMercaderia: costo,
+        gastos: gastos,
+        venta: venta,
+        margen: margen
+      });
 
-    setVentas([...ventas, nuevaVenta]);
-    setCostoMerc('');
-    setGastosVenta('');
-    setMontoVenta('');
-    setFechaNuevaVenta(obtenerFechaLocal());
+      setVentas([...ventas, nuevaVenta]);
+      setCostoMerc('');
+      setGastosVenta('');
+      setMontoVenta('');
+      setFechaNuevaVenta(obtenerFechaLocal());
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al agregar venta');
+    }
   };
 
-  const handleEliminarVenta = (ventaId) => {
+  const handleEliminarVenta = async (ventaId) => {
     const confirmar = window.confirm("¿Estás seguro de eliminar esta venta?");
     if (!confirmar) return;
-    setVentas(ventas.filter(v => v.id !== ventaId));
+    
+    try {
+      await eliminarVenta(ventaId);
+      setVentas(ventas.filter(v => v._id !== ventaId));
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar venta');
+    }
   };
 
   const handleAbrirModalVenta = (venta) => {
@@ -182,7 +245,7 @@ function Verduleria() {
   };
 
   const handleAbrirModalGastos = () => {
-    const gastosDelMes = gastosFijos.filter(g => g.mesId === mesSeleccionado.id);
+    const gastosDelMes = gastosFijos.filter(g => g.mesId === mesSeleccionado.mesId);
     setGastosEditando([...gastosDelMes]);
     setModalGastosAbierto(true);
   };
@@ -215,7 +278,7 @@ function Verduleria() {
     setItemEditando(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleGuardarVentaEditada = (e) => {
+  const handleGuardarVentaEditada = async (e) => {
     e.preventDefault();
     const costo = parseFloat(itemEditando.costoMercaderia);
     const gastos = parseFloat(itemEditando.gastos);
@@ -228,14 +291,29 @@ function Verduleria() {
 
     const margen = venta - costo - gastos;
     
-    const ventasActualizadas = ventas.map(v =>
-      v.id === itemEditando.id
-        ? { ...itemEditando, costoMercaderia: costo, gastos, venta, margen, diaSemana: obtenerDiaSemana(itemEditando.fecha) }
-        : v
-    );
-    
-    setVentas(ventasActualizadas);
-    handleCerrarModales();
+    try {
+      await editarVenta(itemEditando._id, {
+        fecha: itemEditando.fecha,
+        diaSemana: obtenerDiaSemana(itemEditando.fecha),
+        costoMercaderia: costo,
+        gastos,
+        venta,
+        margen
+      });
+      
+      const ventasActualizadas = ventas.map(v =>
+        v._id === itemEditando._id
+          ? { ...itemEditando, costoMercaderia: costo, gastos, venta, margen, diaSemana: obtenerDiaSemana(itemEditando.fecha) }
+          : v
+      );
+      
+      setVentas(ventasActualizadas);
+      handleCerrarModales();
+      alert('✅ Venta editada correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al editar venta');
+    }
   };
 
   const handleGastoFijoChange = (index, field, value) => {
@@ -266,29 +344,36 @@ function Verduleria() {
     e.target.select();
   };
 
-  const handleGuardarGastosFijos = (e) => {
+  const handleGuardarGastosFijos = async (e) => {
     e.preventDefault();
     
-    const gastosParaGuardar = gastosEditando.map(g => ({
-      ...g,
-      total: parseFloat(g.total) || 0,
-      porcentaje: parseFloat(g.porcentaje) || 0,
-      verduleria: parseFloat(g.verduleria) || 0
-    }));
-    
-    const gastosActualizados = gastosFijos.map(g => {
-      const gastoEditado = gastosParaGuardar.find(ge => ge.id === g.id);
-      return gastoEditado ? gastoEditado : g;
-    });
-    
-    setGastosFijos(gastosActualizados);
-    handleCerrarModales();
+    try {
+      for (const gasto of gastosEditando) {
+        await editarGasto(gasto._id, {
+          total: parseFloat(gasto.total) || 0,
+          porcentaje: parseFloat(gasto.porcentaje) || 0,
+          verduleria: parseFloat(gasto.verduleria) || 0
+        });
+      }
+      
+      const gastosActualizados = gastosFijos.map(g => {
+        const gastoEditado = gastosEditando.find(ge => ge._id === g._id);
+        return gastoEditado ? gastoEditado : g;
+      });
+      
+      setGastosFijos(gastosActualizados);
+      handleCerrarModales();
+      alert('✅ Gastos actualizados correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al guardar gastos');
+    }
   };
 
   // --- Cálculos y Estadísticas ---
   
-  const ventasDelMes = mesSeleccionado ? ventas.filter(v => v.mesId === mesSeleccionado.id) : [];
-  const gastosDelMes = mesSeleccionado ? gastosFijos.filter(g => g.mesId === mesSeleccionado.id) : [];
+  const ventasDelMes = mesSeleccionado ? ventas.filter(v => v.mesId === mesSeleccionado.mesId) : [];
+  const gastosDelMes = mesSeleccionado ? gastosFijos.filter(g => g.mesId === mesSeleccionado.mesId) : [];
 
   const totalVentas = ventasDelMes.reduce((sum, v) => sum + v.venta, 0);
   const totalCostoMerc = ventasDelMes.reduce((sum, v) => sum + v.costoMercaderia, 0);
@@ -302,8 +387,8 @@ function Verduleria() {
 
     const formatearFecha = (fechaString) => {
       if (!fechaString) return '';
-      const fecha = new Date(fechaString + 'T00:00:00');
-      return fecha.getDate();
+      const [año, mes, dia] = fechaString.split('T')[0].split('-');
+      return parseInt(dia);
     };
 
     const ventasData = ventasDelMes
@@ -406,12 +491,12 @@ function Verduleria() {
   };
 
   // --- Importar desde Excel ---
-  const handleFileImport = (event) => {
+  const handleFileImport = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target.result;
         const wb = XLSX.read(data, { type: 'buffer' });
@@ -439,7 +524,7 @@ function Verduleria() {
         const mesExistente = meses.find(m => m.nombre.toUpperCase() === nombreMes);
         
         if (mesExistente) {
-          mesId = mesExistente.id;
+          mesId = mesExistente.mesId;
         } else {
           const mesMatch = nombreMes.match(/(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre)\s+(\d{4})/i);
           if (mesMatch) {
@@ -471,8 +556,6 @@ function Verduleria() {
             const fecha = `${año}-${mes}-${String(dia).padStart(2, '0')}`;
             
             nuevasVentas.push({
-              id: Date.now() + i,
-              mesId: mesId,
               fecha: fecha,
               diaSemana: diaSemana,
               costoMercaderia: costoMerc,
@@ -495,8 +578,6 @@ function Verduleria() {
 
           if (concepto && concepto !== 'Gastos' && concepto !== '') {
             nuevosGastosFijos.push({
-              id: Date.now() + i + 1000,
-              mesId: mesId,
               concepto: concepto,
               total: total,
               verduleria: verduleria,
@@ -510,14 +591,27 @@ function Verduleria() {
         );
 
         if (confirmar) {
+          let mesAUsar = mesExistente;
+          
           if (!mesExistente) {
-            const nuevoMes = { id: mesId, nombre: nombreMes };
+            const nuevoMes = await crearMes(mesId, nombreMes);
             setMeses(prev => [...prev, nuevoMes]);
+            mesAUsar = nuevoMes;
             setMesSeleccionado(nuevoMes);
           }
 
-          setVentas(prev => [...prev, ...nuevasVentas]);
-          setGastosFijos(prev => [...prev, ...nuevosGastosFijos]);
+          for (const venta of nuevasVentas) {
+            await agregarVenta(mesAUsar.mesId, venta);
+          }
+          
+          for (const gasto of nuevosGastosFijos) {
+            await agregarGasto(mesAUsar.mesId, gasto);
+          }
+
+          if (mesSeleccionado && mesSeleccionado.mesId === mesAUsar.mesId) {
+            await cargarDatosMes(mesAUsar.mesId);
+          }
+
           alert("¡Datos importados con éxito!");
         }
       } catch (error) {
@@ -529,6 +623,14 @@ function Verduleria() {
     event.target.value = null;
     reader.readAsArrayBuffer(file);
   };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <p>Cargando datos...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -554,9 +656,9 @@ function Verduleria() {
           <div className="lista-container">
             {meses.length === 0 && <p>No hay meses. Crea uno o importa un Excel.</p>}
             {meses.map(mes => (
-              <div key={mes.id} className="card" style={{cursor: 'pointer', position: 'relative'}}>
+              <div key={mes.mesId} className="card" style={{cursor: 'pointer', position: 'relative'}}>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); handleEliminarMes(mes.id); }} 
+                  onClick={(e) => { e.stopPropagation(); handleEliminarMes(mes.mesId); }} 
                   style={{ position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
                 >
                   X
@@ -635,8 +737,8 @@ function Verduleria() {
                 {ventasDelMes
                   .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                   .map(venta => (
-                    <tr key={venta.id}>
-                      <td>{new Date(venta.fecha + 'T00:00:00').toLocaleDateString('es-AR')}</td>
+                    <tr key={venta._id}>
+                      <td>{formatearFechaLocal(venta.fecha)}</td>
                       <td>${venta.costoMercaderia.toLocaleString('es-AR')}</td>
                       <td>${venta.gastos.toLocaleString('es-AR')}</td>
                       <td>${venta.venta.toLocaleString('es-AR')}</td>
@@ -645,7 +747,7 @@ function Verduleria() {
                       </td>
                       <td className="tabla-acciones">
                         <button onClick={() => handleAbrirModalVenta(venta)} className="btn-editar">Editar</button>
-                        <button onClick={() => handleEliminarVenta(venta.id)} className="btn-eliminar">X</button>
+                        <button onClick={() => handleEliminarVenta(venta._id)} className="btn-eliminar">X</button>
                       </td>
                     </tr>
                   ))}
@@ -679,7 +781,7 @@ function Verduleria() {
                 {gastosDelMes
                   .filter(g => (parseFloat(g.verduleria) || 0) > 0)
                   .map(gasto => (
-                    <tr key={gasto.id}>
+                    <tr key={gasto._id}>
                       <td style={{fontWeight: '600'}}>{gasto.concepto}</td>
                       <td>${(parseFloat(gasto.total) || 0).toLocaleString('es-AR')}</td>
                       <td>{(parseFloat(gasto.porcentaje) || 0).toFixed(0)}%</td>
@@ -708,7 +810,7 @@ function Verduleria() {
             <h2>Editar Venta</h2>
             <form onSubmit={handleGuardarVentaEditada} className="form-container" style={{flexDirection: 'column'}}>
               <label>Fecha</label>
-              <input type="date" name="fecha" value={itemEditando.fecha} onChange={handleEdicionVentaChange} />
+              <input type="date" name="fecha" value={itemEditando.fecha?.split('T')[0] || ''} onChange={handleEdicionVentaChange} />
               <label>Costo Mercadería</label>
               <input type="number" step="0.01" min="0" name="costoMercaderia" value={itemEditando.costoMercaderia} onChange={handleEdicionVentaChange} />
               <label>Gastos</label>
@@ -744,7 +846,7 @@ function Verduleria() {
                 </thead>
                 <tbody>
                   {gastosEditando.map((gasto, index) => (
-                    <tr key={gasto.id}>
+                    <tr key={gasto._id}>
                       <td style={{fontWeight: '600'}}>{gasto.concepto}</td>
                       <td>
                         <input type="number" step="0.01" min="0" value={gasto.total}
