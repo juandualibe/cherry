@@ -2,27 +2,33 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { migrarLocalStorageAMongoDB } from '../utils/migrateToMongoDB';
-
-const cargarDatos = (key) => {
-  const datosGuardados = localStorage.getItem(key);
-  return datosGuardados ? JSON.parse(datosGuardados) : [];
-};
+import {
+  obtenerProveedores,
+  obtenerFacturasProveedor,
+  obtenerPagosProveedor
+} from '../services/api';
+import * as XLSX from 'xlsx';
 
 const calcularSaldoPendiente = (proveedorId, todasLasFacturas, todosLosPagos) => {
-    const totalFacturas = todasLasFacturas
-      .filter(f => f.proveedorId === proveedorId)
-      .reduce((total, f) => total + f.monto, 0);
-      
-    const totalRechazos = todasLasFacturas
-      .filter(f => f.proveedorId === proveedorId)
-      .reduce((total, f) => total + (f.rechazo || 0), 0);
-      
-    const totalPagos = todosLosPagos
-      .filter(p => p.proveedorId === proveedorId)
-      .reduce((total, p) => total + p.monto, 0);
+  const totalFacturas = todasLasFacturas
+    .filter(f => f.proveedorId === proveedorId)
+    .reduce((total, f) => total + f.monto, 0);
+    
+  const totalRechazos = todasLasFacturas
+    .filter(f => f.proveedorId === proveedorId)
+    .reduce((total, f) => total + (f.rechazo || 0), 0);
+    
+  const totalPagos = todosLosPagos
+    .filter(p => p.proveedorId === proveedorId)
+    .reduce((total, p) => total + p.monto, 0);
 
-    return totalFacturas - totalRechazos - totalPagos;
+  return totalFacturas - totalRechazos - totalPagos;
+};
+
+const formatearFechaLocal = (fechaString) => {
+  if (!fechaString) return '';
+  const [año, mes, dia] = fechaString.split('T')[0].split('-');
+  return `${dia}/${mes}/${año}`;
 };
 
 const hoy = new Date();
@@ -40,82 +46,210 @@ function Inicio() {
   const [alertasProximasVencer, setAlertasProximasVencer] = useState([]);
   const [alertasPorVencer, setAlertasPorVencer] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [migrating, setMigrating] = useState(false);
+  const [backupExpandido, setBackupExpandido] = useState(false);
+  const [generandoBackup, setGenerandoBackup] = useState(false);
 
   useEffect(() => {
-    const proveedores = cargarDatos('proveedores');
-    const facturas = cargarDatos('facturasProveedores');
-    const pagos = cargarDatos('pagosProveedores');
-    
-    const alertasVencidasTemp = [];
-    const alertasProximasVencerTemp = [];
-    const alertasPorVencerTemp = [];
+    cargarAlertas();
+  }, []);
 
-    for (const proveedor of proveedores) {
-      const saldo = calcularSaldoPendiente(proveedor.id, facturas, pagos);
+  const cargarAlertas = async () => {
+    try {
+      setLoading(true);
+      const proveedores = await obtenerProveedores();
       
-      if (saldo <= 0) {
-        continue;
+      // Cargar todas las facturas y pagos
+      const todasLasFacturas = [];
+      const todosLosPagos = [];
+      
+      for (const proveedor of proveedores) {
+        const facturas = await obtenerFacturasProveedor(proveedor._id);
+        const pagos = await obtenerPagosProveedor(proveedor._id);
+        todasLasFacturas.push(...facturas);
+        todosLosPagos.push(...pagos);
       }
-
-      const facturasProveedor = facturas.filter(f => f.proveedorId === proveedor.id);
       
-      let tieneVencidas = false;
-      let tieneProximasVencer = false;
-      let tienePorVencer = false;
+      const alertasVencidasTemp = [];
+      const alertasProximasVencerTemp = [];
+      const alertasPorVencerTemp = [];
 
-      for (const factura of facturasProveedor) {
-        if (factura.fechaVencimiento) {
-          const fechaVenc = new Date(factura.fechaVencimiento + 'T00:00:00');
+      for (const proveedor of proveedores) {
+        const saldo = calcularSaldoPendiente(proveedor._id, todasLasFacturas, todosLosPagos);
+        
+        if (saldo <= 0) {
+          continue;
+        }
 
-          if (fechaVenc < hoy) {
-            tieneVencidas = true;
-          } else if (fechaVenc >= hoy && fechaVenc <= tresDiasDespues) {
-            tieneProximasVencer = true;
-          } else if (fechaVenc > tresDiasDespues && fechaVenc <= sieteDiasDespues) {
-            tienePorVencer = true;
+        const facturasProveedor = todasLasFacturas.filter(f => f.proveedorId === proveedor._id);
+        
+        let tieneVencidas = false;
+        let tieneProximasVencer = false;
+        let tienePorVencer = false;
+
+        for (const factura of facturasProveedor) {
+          if (factura.fechaVencimiento) {
+            const [año, mes, dia] = factura.fechaVencimiento.split('T')[0].split('-');
+            const fechaVenc = new Date(año, mes - 1, dia);
+
+            if (fechaVenc < hoy) {
+              tieneVencidas = true;
+            } else if (fechaVenc >= hoy && fechaVenc <= tresDiasDespues) {
+              tieneProximasVencer = true;
+            } else if (fechaVenc > tresDiasDespues && fechaVenc <= sieteDiasDespues) {
+              tienePorVencer = true;
+            }
           }
+        }
+
+        const infoAlerta = {
+          id: proveedor._id,
+          nombre: proveedor.nombre,
+          saldo: saldo
+        };
+
+        if (tieneVencidas) {
+          alertasVencidasTemp.push(infoAlerta);
+        } else if (tieneProximasVencer) {
+          alertasProximasVencerTemp.push(infoAlerta);
+        } else if (tienePorVencer) {
+          alertasPorVencerTemp.push(infoAlerta);
         }
       }
 
-      const infoAlerta = {
-        id: proveedor.id,
-        nombre: proveedor.nombre,
-        saldo: saldo
-      };
-
-      if (tieneVencidas) {
-        alertasVencidasTemp.push(infoAlerta);
-      } else if (tieneProximasVencer) {
-        alertasProximasVencerTemp.push(infoAlerta);
-      } else if (tienePorVencer) {
-        alertasPorVencerTemp.push(infoAlerta);
-      }
+      setAlertasVencidas(alertasVencidasTemp);
+      setAlertasProximasVencer(alertasProximasVencerTemp);
+      setAlertasPorVencer(alertasPorVencerTemp);
+    } catch (error) {
+      console.error('Error cargando alertas:', error);
+      alert('Error al cargar las alertas. ¿Está el backend funcionando?');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setAlertasVencidas(alertasVencidasTemp);
-    setAlertasProximasVencer(alertasProximasVencerTemp);
-    setAlertasPorVencer(alertasPorVencerTemp);
-    setLoading(false);
-
-  }, []);
-
-  const handleMigrar = async () => {
-    const confirmar = window.confirm(
-      '¿Estás seguro de migrar todos tus datos a MongoDB Atlas?\n\n' +
-      'Esto copiará todos tus datos del navegador a la nube.\n' +
-      'Tus datos locales NO se borrarán.\n\n' +
-      '⚠️ Solo hazlo UNA VEZ para evitar duplicados.'
-    );
-    
-    if (confirmar) {
-      setMigrating(true);
-      const resultado = await migrarLocalStorageAMongoDB();
-      setMigrating(false);
+  const handleGenerarBackup = async () => {
+    try {
+      setGenerandoBackup(true);
       
-      if (resultado) {
-        console.log('✅ Migración completada');
+      // Importar todas las funciones necesarias
+      const { 
+        obtenerClientes, 
+        obtenerDeudasCliente,
+        obtenerMeses,
+        obtenerVentasMes,
+        obtenerGastosMes
+      } = await import('../services/api');
+      
+      // Cargar todos los datos
+      const clientes = await obtenerClientes();
+      const proveedores = await obtenerProveedores();
+      const meses = await obtenerMeses();
+      
+      const todasLasDeudas = [];
+      for (const cliente of clientes) {
+        const deudas = await obtenerDeudasCliente(cliente._id);
+        todasLasDeudas.push(...deudas);
       }
+      
+      const todasLasFacturas = [];
+      const todosLosPagos = [];
+      for (const proveedor of proveedores) {
+        const facturas = await obtenerFacturasProveedor(proveedor._id);
+        const pagos = await obtenerPagosProveedor(proveedor._id);
+        todasLasFacturas.push(...facturas);
+        todosLosPagos.push(...pagos);
+      }
+      
+      const todasLasVentas = [];
+      const todosLosGastos = [];
+      for (const mes of meses) {
+        const ventas = await obtenerVentasMes(mes.mesId);
+        const gastos = await obtenerGastosMes(mes.mesId);
+        todasLasVentas.push(...ventas);
+        todosLosGastos.push(...gastos);
+      }
+      
+      // Crear Excel
+      const wb = XLSX.utils.book_new();
+      
+      // Hoja 1: Clientes
+      const clientesData = clientes.map(c => ({
+        Nombre: c.nombre,
+        'Total Deuda': todasLasDeudas.filter(d => d.clienteId === c._id).reduce((sum, d) => sum + d.monto, 0)
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientesData), 'Clientes');
+      
+      // Hoja 2: Deudas
+      const deudasData = todasLasDeudas.map(d => {
+        const cliente = clientes.find(c => c._id === d.clienteId);
+        return {
+          Cliente: cliente?.nombre || 'Desconocido',
+          Fecha: formatearFechaLocal(d.fecha),
+          Monto: d.monto
+        };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deudasData), 'Deudas');
+      
+      // Hoja 3: Proveedores
+      const proveedoresData = proveedores.map(p => ({
+        Nombre: p.nombre,
+        'Saldo Pendiente': calcularSaldoPendiente(p._id, todasLasFacturas, todosLosPagos)
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(proveedoresData), 'Proveedores');
+      
+      // Hoja 4: Facturas
+      const facturasData = todasLasFacturas.map(f => {
+        const proveedor = proveedores.find(p => p._id === f.proveedorId);
+        return {
+          Proveedor: proveedor?.nombre || 'Desconocido',
+          Fecha: formatearFechaLocal(f.fecha),
+          Vencimiento: formatearFechaLocal(f.fechaVencimiento),
+          Numero: f.numero,
+          Monto: f.monto,
+          Rechazo: f.rechazo || 0
+        };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(facturasData), 'Facturas');
+      
+      // Hoja 5: Pagos
+      const pagosData = todosLosPagos.map(p => {
+        const proveedor = proveedores.find(prov => prov._id === p.proveedorId);
+        return {
+          Proveedor: proveedor?.nombre || 'Desconocido',
+          Fecha: formatearFechaLocal(p.fecha),
+          Monto: p.monto
+        };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pagosData), 'Pagos');
+      
+      // Hoja 6: Verdulería Meses
+      const mesesData = meses.map(m => {
+        const ventas = todasLasVentas.filter(v => v.mesId === m.mesId);
+        const gastos = todosLosGastos.filter(g => g.mesId === m.mesId);
+        const totalVentas = ventas.reduce((sum, v) => sum + v.venta, 0);
+        const totalCostos = ventas.reduce((sum, v) => sum + v.costoMercaderia + v.gastos, 0);
+        const totalGastosFijos = gastos.reduce((sum, g) => sum + (g.verduleria || 0), 0);
+        return {
+          Mes: m.nombre,
+          'Total Ventas': totalVentas,
+          'Total Costos': totalCostos,
+          'Gastos Fijos': totalGastosFijos,
+          'Resultado': totalVentas - totalCostos - totalGastosFijos
+        };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mesesData), 'Verdulería Resumen');
+      
+      // Generar archivo
+      const fecha = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Backup_Cherry_${fecha}.xlsx`);
+      
+      alert('✅ Backup generado exitosamente');
+      setBackupExpandido(false);
+    } catch (error) {
+      console.error('Error generando backup:', error);
+      alert('Error al generar el backup');
+    } finally {
+      setGenerandoBackup(false);
     }
   };
 
@@ -125,40 +259,66 @@ function Inicio() {
       <h1>🍒 Dashboard de Cherry</h1>
       <p>Resumen rápido de las cuentas a pagar a proveedores.</p>
 
-      {/* SECCIÓN DE MIGRACIÓN */}
+      {/* SECCIÓN DE BACKUP COLAPSABLE */}
       <div style={{
-        marginBottom: '3rem',
-        padding: '1.5rem',
-        background: 'linear-gradient(135deg, #00ED64 0%, #00C853 100%)',
+        marginBottom: '2rem',
+        border: '2px solid #e0e0e0',
         borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0,237,100,0.3)'
+        overflow: 'hidden'
       }}>
-        <h2 style={{margin: '0 0 1rem 0', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-          🍃 Migrar a MongoDB Atlas
-        </h2>
-        <p style={{color: 'white', opacity: 0.9, marginBottom: '1rem'}}>
-          Migra tus datos a la nube para tener backups automáticos y acceso desde cualquier dispositivo.
-        </p>
-        <button 
-          onClick={handleMigrar}
-          disabled={migrating}
-          className="btn"
+        <button
+          onClick={() => setBackupExpandido(!backupExpandido)}
           style={{
-            backgroundColor: 'white',
-            color: '#00C853',
-            fontSize: '1rem',
-            padding: '0.75rem 1.5rem',
+            width: '100%',
+            padding: '1rem 1.5rem',
+            background: backupExpandido ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f8f9fa',
+            color: backupExpandido ? 'white' : '#333',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '1.1rem',
             fontWeight: '600',
-            cursor: migrating ? 'not-allowed' : 'pointer',
-            opacity: migrating ? 0.7 : 1
+            transition: 'all 0.3s ease'
           }}
         >
-          {migrating ? '⏳ Migrando datos...' : '🚀 Migrar datos a MongoDB'}
+          <span>💾 Generar Backup Completo</span>
+          <span style={{fontSize: '1.5rem', transition: 'transform 0.3s ease', transform: backupExpandido ? 'rotate(180deg)' : 'rotate(0deg)'}}>
+            ▼
+          </span>
         </button>
-        {migrating && (
-          <p style={{color: 'white', marginTop: '1rem', fontSize: '0.9rem'}}>
-            ⚠️ No cierres esta ventana hasta que termine...
-          </p>
+        
+        {backupExpandido && (
+          <div style={{
+            padding: '1.5rem',
+            background: 'white',
+            borderTop: '2px solid #e0e0e0'
+          }}>
+            <p style={{color: '#666', marginBottom: '1rem'}}>
+              📊 Descarga un archivo Excel con todos tus datos actuales de MongoDB:
+            </p>
+            <ul style={{color: '#666', marginBottom: '1.5rem', paddingLeft: '1.5rem'}}>
+              <li>Clientes y deudas</li>
+              <li>Proveedores, facturas y pagos</li>
+              <li>Verdulería (ventas y gastos)</li>
+            </ul>
+            <button 
+              onClick={handleGenerarBackup}
+              disabled={generandoBackup}
+              className="btn"
+              style={{
+                backgroundColor: '#28a745',
+                fontSize: '1rem',
+                padding: '0.75rem 1.5rem',
+                fontWeight: '600',
+                cursor: generandoBackup ? 'not-allowed' : 'pointer',
+                opacity: generandoBackup ? 0.7 : 1
+              }}
+            >
+              {generandoBackup ? '⏳ Generando backup...' : '📥 Descargar Backup'}
+            </button>
+          </div>
         )}
       </div>
 
