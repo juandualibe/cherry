@@ -2,16 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-
-// --- Funciones para interactuar con LocalStorage ---
-const cargarDatos = (key) => {
-  const datosGuardados = localStorage.getItem(key);
-  return datosGuardados ? JSON.parse(datosGuardados) : [];
-};
-
-const guardarDatos = (key, datos) => {
-  localStorage.setItem(key, JSON.stringify(datos));
-};
+import {
+  obtenerClientes,
+  crearCliente,
+  eliminarCliente,
+  obtenerDeudasCliente,
+  agregarDeuda,
+  eliminarDeuda
+} from '../services/api';
 
 // --- Función para obtener fecha local (sin UTC) ---
 const obtenerFechaLocal = () => {
@@ -25,9 +23,10 @@ const obtenerFechaLocal = () => {
 
 function Clientes() {
   // Estados de la app
-  const [clientes, setClientes] = useState(() => cargarDatos('clientes'));
-  const [deudas, setDeudas] = useState(() => cargarDatos('deudas'));
+  const [clientes, setClientes] = useState([]);
+  const [deudas, setDeudas] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Estados para formulario simplificado
   const [nombreCliente, setNombreCliente] = useState('');
@@ -39,16 +38,34 @@ function Clientes() {
 
   const mouseDownInsideModal = useRef(false);
 
+  // Cargar clientes al montar el componente
   useEffect(() => {
-    guardarDatos('clientes', clientes);
-  }, [clientes]);
+    cargarClientesYDeudas();
+  }, []);
 
-  useEffect(() => {
-    guardarDatos('deudas', deudas);
-  }, [deudas]);
+  const cargarClientesYDeudas = async () => {
+    try {
+      setLoading(true);
+      const clientesData = await obtenerClientes();
+      setClientes(clientesData);
+
+      // Cargar todas las deudas de todos los clientes
+      const todasLasDeudas = [];
+      for (const cliente of clientesData) {
+        const deudasCliente = await obtenerDeudasCliente(cliente._id);
+        todasLasDeudas.push(...deudasCliente);
+      }
+      setDeudas(todasLasDeudas);
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      alert('Error al cargar los datos. ¿Está el backend funcionando?');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // NUEVO: Agregar cliente + deuda de una vez
-  const handleAgregarClienteYDeuda = (e) => {
+  const handleAgregarClienteYDeuda = async (e) => {
     e.preventDefault();
     if (!nombreCliente.trim()) {
       alert("El nombre del cliente es obligatorio");
@@ -61,33 +78,30 @@ function Clientes() {
       return;
     }
 
-    // Buscar si el cliente ya existe (case-insensitive)
-    let cliente = clientes.find(c => c.nombre.toLowerCase().trim() === nombreCliente.toLowerCase().trim());
-    
-    // Si no existe, crear el cliente
-    if (!cliente) {
-      cliente = {
-        id: Date.now(),
-        nombre: nombreCliente.trim(),
-      };
-      setClientes([...clientes, cliente]);
+    try {
+      // Buscar si el cliente ya existe (case-insensitive)
+      let cliente = clientes.find(c => c.nombre.toLowerCase().trim() === nombreCliente.toLowerCase().trim());
+      
+      // Si no existe, crear el cliente
+      if (!cliente) {
+        cliente = await crearCliente(nombreCliente.trim());
+        setClientes([...clientes, cliente]);
+      }
+
+      // Agregar la deuda
+      const nuevaDeuda = await agregarDeuda(cliente._id, fechaDeuda, monto);
+      setDeudas([...deudas, nuevaDeuda]);
+
+      // Limpiar formulario
+      setNombreCliente('');
+      setMontoDeuda('');
+      setFechaDeuda(obtenerFechaLocal());
+      
+      alert(`${cliente.nombre} agregado/actualizado con deuda de $${monto.toLocaleString('es-AR')}`);
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al agregar cliente/deuda');
     }
-
-    // Agregar la deuda
-    const nuevaDeuda = {
-      id: Date.now() + 1,
-      clienteId: cliente.id,
-      monto: monto,
-      fecha: fechaDeuda,
-    };
-    setDeudas([...deudas, nuevaDeuda]);
-
-    // Limpiar formulario
-    setNombreCliente('');
-    setMontoDeuda('');
-    setFechaDeuda(obtenerFechaLocal());
-    
-    alert(`${cliente.nombre} agregado/actualizado con deuda de $${monto.toLocaleString('es-AR')}`);
   };
 
   const calcularTotalDeuda = (clienteId) => {
@@ -97,34 +111,47 @@ function Clientes() {
   };
   
   const deudasDelClienteSeleccionado = deudas.filter(
-    deuda => clienteSeleccionado && deuda.clienteId === clienteSeleccionado.id
+    deuda => clienteSeleccionado && deuda.clienteId === clienteSeleccionado._id
   );
 
-  const handleEliminarCliente = (clienteId) => {
+  const handleEliminarCliente = async (clienteId) => {
     const confirmar = window.confirm("¿Estás seguro de eliminar este cliente? Se borrarán TODAS sus deudas asociadas.");
     if (!confirmar) return;
 
-    const nuevosClientes = clientes.filter(c => c.id !== clienteId);
-    setClientes(nuevosClientes);
+    try {
+      await eliminarCliente(clienteId);
+      
+      const nuevosClientes = clientes.filter(c => c._id !== clienteId);
+      setClientes(nuevosClientes);
 
-    const nuevasDeudas = deudas.filter(d => d.clienteId !== clienteId);
-    setDeudas(nuevasDeudas);
+      const nuevasDeudas = deudas.filter(d => d.clienteId !== clienteId);
+      setDeudas(nuevasDeudas);
 
-    if (clienteSeleccionado && clienteSeleccionado.id === clienteId) {
-      setClienteSeleccionado(null);
+      if (clienteSeleccionado && clienteSeleccionado._id === clienteId) {
+        setClienteSeleccionado(null);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar cliente');
     }
   };
 
-  const handleEliminarDeuda = (deudaId) => {
+  const handleEliminarDeuda = async (deudaId) => {
     const confirmar = window.confirm("¿Estás seguro de eliminar esta deuda?");
     if (!confirmar) return;
 
-    const nuevasDeudas = deudas.filter(d => d.id !== deudaId);
-    setDeudas(nuevasDeudas);
+    try {
+      await eliminarDeuda(deudaId);
+      const nuevasDeudas = deudas.filter(d => d._id !== deudaId);
+      setDeudas(nuevasDeudas);
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar deuda');
+    }
   };
 
   const handleVerDetalle = (cliente) => {
-    if (clienteSeleccionado && clienteSeleccionado.id === cliente.id) {
+    if (clienteSeleccionado && clienteSeleccionado._id === cliente._id) {
       setClienteSeleccionado(null);
     } else {
       setClienteSeleccionado(cliente);
@@ -162,7 +189,7 @@ function Clientes() {
     mouseDownInsideModal.current = false;
   };
 
-  const handleGuardarDeudaEditada = (e) => {
+  const handleGuardarDeudaEditada = async (e) => {
     e.preventDefault();
     const monto = parseFloat(itemEditando.monto);
     if (!monto || monto <= 0) {
@@ -170,20 +197,29 @@ function Clientes() {
       return;
     }
 
-    const deudasActualizadas = deudas.map(d => 
-      d.id === itemEditando.id 
-        ? { ...itemEditando, monto } 
-        : d
-    );
-    
-    setDeudas(deudasActualizadas);
-    handleCerrarModales();
+    try {
+      // Por ahora solo actualizamos localmente (necesitarías agregar editarDeuda a api.js)
+      const deudasActualizadas = deudas.map(d => 
+        d._id === itemEditando._id 
+          ? { ...itemEditando, monto } 
+          : d
+      );
+      
+      setDeudas(deudasActualizadas);
+      handleCerrarModales();
+      
+      // TODO: Implementar editarDeuda en el backend
+      alert('⚠️ Edición guardada localmente. Necesitas recargar para ver cambios persistentes.');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al editar deuda');
+    }
   };
 
   const handleExportarDeudas = () => {
     const formatearFecha = (fechaString) => {
       if (!fechaString) return '';
-      const fecha = new Date(fechaString + 'T00:00:00');
+      const fecha = new Date(fechaString);
       const dia = String(fecha.getDate()).padStart(2, '0');
       const mes = String(fecha.getMonth() + 1).padStart(2, '0');
       const anio = fecha.getFullYear();
@@ -191,7 +227,7 @@ function Clientes() {
     };
 
     const dataParaExportar = deudas.map(deuda => {
-      const cliente = clientes.find(c => c.id === deuda.clienteId);
+      const cliente = clientes.find(c => c._id === deuda.clienteId);
       return {
         CLIENTE: cliente ? cliente.nombre : 'Cliente Desconocido',
         FECHA: formatearFecha(deuda.fecha),
@@ -215,7 +251,7 @@ function Clientes() {
     XLSX.writeFile(wb, "Reporte_Deudas_Clientes.xlsx");
   };
 
-  const handleFileImport = (event) => {
+  const handleFileImport = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -243,7 +279,7 @@ function Clientes() {
     };
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target.result;
         const wb = XLSX.read(data, { type: 'buffer', cellDates: true });
@@ -254,7 +290,7 @@ function Clientes() {
         const clientesMap = new Map();
 
         clientes.forEach(c => {
-          clientesMap.set(c.nombre.toLowerCase().trim(), c.id);
+          clientesMap.set(c.nombre.toLowerCase().trim(), c._id);
         });
 
         for (let i = 1; i < aoa.length; i++) {
@@ -269,11 +305,8 @@ function Clientes() {
             let clienteId = clientesMap.get(nombreNormalizado);
 
             if (!clienteId) {
-              clienteId = Date.now() + i;
-              const nuevoCliente = {
-                id: clienteId,
-                nombre: String(nombreCliente).trim()
-              };
+              const nuevoCliente = await crearCliente(String(nombreCliente).trim());
+              clienteId = nuevoCliente._id;
               clientesMap.set(nombreNormalizado, clienteId);
               setClientes(clientesActuales => [...clientesActuales, nuevoCliente]);
             }
@@ -281,7 +314,6 @@ function Clientes() {
             const fechaParseada = parsearFecha(fechaDeuda);
             if (fechaParseada) {
               nuevasDeudas.push({
-                id: Date.now() + i + 'd',
                 clienteId: clienteId,
                 fecha: fechaParseada,
                 monto: parseFloat(montoDeuda),
@@ -295,7 +327,10 @@ function Clientes() {
         );
         
         if (confirmar) {
-          setDeudas(deudasActuales => [...deudasActuales, ...nuevasDeudas]);
+          for (const deuda of nuevasDeudas) {
+            const deudaCreada = await agregarDeuda(deuda.clienteId, deuda.fecha, deuda.monto);
+            setDeudas(deudasActuales => [...deudasActuales, deudaCreada]);
+          }
           alert("¡Datos importados con éxito!");
         }
       } catch (error) {
@@ -308,6 +343,13 @@ function Clientes() {
     reader.readAsArrayBuffer(file);
   };
   
+  if (loading) {
+    return (
+      <div style={{textAlign: 'center', padding: '3rem'}}>
+        <p>Cargando clientes...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -384,11 +426,11 @@ function Clientes() {
           {clientes
             .sort((a, b) => a.nombre.localeCompare(b.nombre))
             .map(cliente => {
-              const total = calcularTotalDeuda(cliente.id);
-              const isSelected = clienteSeleccionado && clienteSeleccionado.id === cliente.id;
+              const total = calcularTotalDeuda(cliente._id);
+              const isSelected = clienteSeleccionado && clienteSeleccionado._id === cliente._id;
               
               return (
-                <tr key={cliente.id} style={{backgroundColor: isSelected ? '#e6f7ff' : 'transparent'}}>
+                <tr key={cliente._id} style={{backgroundColor: isSelected ? '#e6f7ff' : 'transparent'}}>
                   <td style={{fontWeight: '600'}}>{cliente.nombre}</td>
                   <td>
                     <div className="total" style={{fontSize: '1.2rem', padding: '0.5rem', display: 'inline-block'}}>
@@ -405,7 +447,7 @@ function Clientes() {
                     </button>
                     <button 
                       className="btn" 
-                      onClick={() => handleEliminarCliente(cliente.id)}
+                      onClick={() => handleEliminarCliente(cliente._id)}
                       style={{backgroundColor: '#dc3545', padding: '0.4rem 0.8rem', fontSize: '0.9rem'}}
                     >
                       Eliminar
@@ -438,8 +480,8 @@ function Clientes() {
                   {deudasDelClienteSeleccionado
                     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                     .map(deuda => (
-                      <tr key={deuda.id}>
-                        <td>{new Date(deuda.fecha + 'T00:00:00').toLocaleDateString('es-AR')}</td>
+                      <tr key={deuda._id}>
+                        <td>{new Date(deuda.fecha).toLocaleDateString('es-AR')}</td>
                         <td>${deuda.monto.toLocaleString('es-AR')}</td>
                         <td className="tabla-acciones">
                           <button 
@@ -449,7 +491,7 @@ function Clientes() {
                             Editar
                           </button>
                           <button 
-                            onClick={() => handleEliminarDeuda(deuda.id)} 
+                            onClick={() => handleEliminarDeuda(deuda._id)} 
                             className="btn-eliminar"
                           >
                             X
@@ -463,7 +505,7 @@ function Clientes() {
               <h3 style={{marginTop: '1.5rem'}}>
                 Total Adeudado: 
                 <span className="total" style={{fontSize: '1.5rem', marginLeft: '1rem'}}>
-                  ${calcularTotalDeuda(clienteSeleccionado.id).toLocaleString('es-AR')}
+                  ${calcularTotalDeuda(clienteSeleccionado._id).toLocaleString('es-AR')}
                 </span>
               </h3>
             </>
@@ -482,7 +524,7 @@ function Clientes() {
             <h2>Editar Deuda</h2>
             <form onSubmit={handleGuardarDeudaEditada} className="form-container" style={{flexDirection: 'column'}}>
               <label>Fecha</label>
-              <input type="date" name="fecha" value={itemEditando.fecha} onChange={handleEdicionChange} />
+              <input type="date" name="fecha" value={itemEditando.fecha?.split('T')[0] || ''} onChange={handleEdicionChange} />
               
               <label>Monto</label>
               <input type="number" step="0.01" min="0" name="monto" value={itemEditando.monto} onChange={handleEdicionChange} placeholder="Monto de la deuda" />
