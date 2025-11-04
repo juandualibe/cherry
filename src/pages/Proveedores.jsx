@@ -2,16 +2,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-
-// --- Funciones para interactuar con LocalStorage ---
-const cargarDatos = (key) => {
-  const datosGuardados = localStorage.getItem(key);
-  return datosGuardados ? JSON.parse(datosGuardados) : [];
-};
-
-const guardarDatos = (key, datos) => {
-  localStorage.setItem(key, JSON.stringify(datos));
-};
+import {
+  obtenerProveedores,
+  crearProveedor,
+  eliminarProveedor,
+  obtenerFacturasProveedor,
+  agregarFactura,
+  editarFactura,
+  eliminarFactura,
+  obtenerPagosProveedor,
+  agregarPago,
+  editarPago,
+  eliminarPago
+} from '../services/api';
 
 // --- Función para obtener fecha local (sin UTC) ---
 const obtenerFechaLocal = () => {
@@ -22,12 +25,23 @@ const obtenerFechaLocal = () => {
   return `${año}-${mes}-${dia}`;
 };
 
+// --- Función para formatear fecha sin conversión de zona horaria ---
+const formatearFechaLocal = (fechaString) => {
+  if (!fechaString) return '';
+  const [año, mes, dia] = fechaString.split('T')[0].split('-');
+  return `${dia}/${mes}/${año}`;
+};
+
 // --- Función de ayuda para sumar días ---
 const sumarDias = (fechaString, dias) => {
   try {
-    const fecha = new Date(fechaString + 'T00:00:00');
+    const [año, mes, dia] = fechaString.split('-');
+    const fecha = new Date(año, mes - 1, dia);
     fecha.setDate(fecha.getDate() + dias);
-    return fecha.toISOString().split('T')[0];
+    const nuevoAño = fecha.getFullYear();
+    const nuevoMes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const nuevoDia = String(fecha.getDate()).padStart(2, '0');
+    return `${nuevoAño}-${nuevoMes}-${nuevoDia}`;
   } catch (e) {
     return ''; 
   }
@@ -36,10 +50,11 @@ const sumarDias = (fechaString, dias) => {
 
 function Proveedores() {
   // Estados de siempre
-  const [proveedores, setProveedores] = useState(() => cargarDatos('proveedores'));
-  const [facturas, setFacturas] = useState(() => cargarDatos('facturasProveedores'));
-  const [pagos, setPagos] = useState(() => cargarDatos('pagosProveedores'));
+  const [proveedores, setProveedores] = useState([]);
+  const [facturas, setFacturas] = useState([]);
+  const [pagos, setPagos] = useState([]);
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   // Estados para formularios de "Añadir"
   const [nombreNuevoProveedor, setNombreNuevoProveedor] = useState('');
@@ -59,10 +74,35 @@ function Proveedores() {
 
   const mouseDownInsideModal = useRef(false);
 
-  // --- Efectos para Guardar Datos ---
-  useEffect(() => { guardarDatos('proveedores', proveedores); }, [proveedores]);
-  useEffect(() => { guardarDatos('facturasProveedores', facturas); }, [facturas]);
-  useEffect(() => { guardarDatos('pagosProveedores', pagos); }, [pagos]);
+  // Cargar proveedores al montar el componente
+  useEffect(() => {
+    cargarProveedoresYDatos();
+  }, []);
+
+  const cargarProveedoresYDatos = async () => {
+    try {
+      setLoading(true);
+      const proveedoresData = await obtenerProveedores();
+      setProveedores(proveedoresData);
+
+      // Cargar todas las facturas y pagos de todos los proveedores
+      const todasLasFacturas = [];
+      const todosLosPagos = [];
+      for (const proveedor of proveedoresData) {
+        const facturasProveedor = await obtenerFacturasProveedor(proveedor._id);
+        const pagosProveedor = await obtenerPagosProveedor(proveedor._id);
+        todasLasFacturas.push(...facturasProveedor);
+        todosLosPagos.push(...pagosProveedor);
+      }
+      setFacturas(todasLasFacturas);
+      setPagos(todosLosPagos);
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      alert('Error al cargar los datos. ¿Está el backend funcionando?');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     setFechaVencimientoNuevaFactura(sumarDias(fechaNuevaFactura, 7));
@@ -70,34 +110,47 @@ function Proveedores() {
 
   // --- Funciones de Lógica ---
   
-  const handleAgregarProveedor = (e) => {
+  const handleAgregarProveedor = async (e) => {
     e.preventDefault();
     if (!nombreNuevoProveedor.trim()) return;
-    const nuevoProveedor = { id: Date.now(), nombre: nombreNuevoProveedor };
-    setProveedores([...proveedores, nuevoProveedor]);
-    setNombreNuevoProveedor('');
+    
+    try {
+      const nuevoProveedor = await crearProveedor(nombreNuevoProveedor.trim());
+      setProveedores([...proveedores, nuevoProveedor]);
+      setNombreNuevoProveedor('');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al crear proveedor');
+    }
   };
 
   const handleCardClick = (proveedor) => {
-    if (proveedorSeleccionado && proveedorSeleccionado.id === proveedor.id) {
+    if (proveedorSeleccionado && proveedorSeleccionado._id === proveedor._id) {
       setProveedorSeleccionado(null);
     } else {
       setProveedorSeleccionado(proveedor);
     }
   };
 
-  const handleEliminarProveedor = (proveedorId) => {
+  const handleEliminarProveedor = async (proveedorId) => {
     const confirmar = window.confirm("¿Estás seguro de eliminar este proveedor? Se borrarán TODAS sus facturas y pagos asociados.");
     if (!confirmar) return;
-    setProveedores(proveedores.filter(p => p.id !== proveedorId));
-    setFacturas(facturas.filter(f => f.proveedorId !== proveedorId));
-    setPagos(pagos.filter(p => p.proveedorId !== proveedorId));
-    if (proveedorSeleccionado && proveedorSeleccionado.id === proveedorId) {
-      setProveedorSeleccionado(null);
+    
+    try {
+      await eliminarProveedor(proveedorId);
+      setProveedores(proveedores.filter(p => p._id !== proveedorId));
+      setFacturas(facturas.filter(f => f.proveedorId !== proveedorId));
+      setPagos(pagos.filter(p => p.proveedorId !== proveedorId));
+      if (proveedorSeleccionado && proveedorSeleccionado._id === proveedorId) {
+        setProveedorSeleccionado(null);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar proveedor');
     }
   };
 
-  const handleAgregarFactura = (e) => {
+  const handleAgregarFactura = async (e) => {
     e.preventDefault();
     const monto = parseFloat(montoNuevaFactura);
     const rechazo = parseFloat(montoRechazo) || 0;
@@ -106,43 +159,71 @@ function Proveedores() {
         alert("Por favor, completa la fecha, vencimiento, N° de factura y el monto.");
         return;
     }
-    const nuevaFactura = { 
-      id: Date.now(), 
-      proveedorId: proveedorSeleccionado.id, 
-      fecha: fechaNuevaFactura, 
-      fechaVencimiento: fechaVencimientoNuevaFactura,
-      numero: numero, 
-      monto: monto, 
-      rechazo: rechazo 
-    };
-    setFacturas([...facturas, nuevaFactura]);
-    setNumeroNuevaFactura('');
-    setMontoNuevaFactura('');
-    setMontoRechazo('');
-    const hoy = obtenerFechaLocal();
-    setFechaNuevaFactura(hoy);
-    setFechaVencimientoNuevaFactura(sumarDias(hoy, 7));
+    
+    try {
+      const nuevaFactura = await agregarFactura(proveedorSeleccionado._id, { 
+        fecha: fechaNuevaFactura, 
+        fechaVencimiento: fechaVencimientoNuevaFactura,
+        numero: numero, 
+        monto: monto, 
+        rechazo: rechazo 
+      });
+      setFacturas([...facturas, nuevaFactura]);
+      setNumeroNuevaFactura('');
+      setMontoNuevaFactura('');
+      setMontoRechazo('');
+      const hoy = obtenerFechaLocal();
+      setFechaNuevaFactura(hoy);
+      setFechaVencimientoNuevaFactura(sumarDias(hoy, 7));
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al agregar factura');
+    }
   };
 
-  const handleAgregarPago = (e) => {
+  const handleAgregarPago = async (e) => {
     e.preventDefault();
     const monto = parseFloat(montoNuevoPago);
     if (!monto || monto <= 0 || !proveedorSeleccionado) return;
-    const nuevoPago = { id: Date.now(), proveedorId: proveedorSeleccionado.id, monto: monto, fecha: fechaNuevoPago };
-    setPagos([...pagos, nuevoPago]);
-    setMontoNuevoPago('');
+    
+    try {
+      const nuevoPago = await agregarPago(proveedorSeleccionado._id, { 
+        monto: monto, 
+        fecha: fechaNuevoPago 
+      });
+      setPagos([...pagos, nuevoPago]);
+      setMontoNuevoPago('');
+      setFechaNuevoPago(obtenerFechaLocal());
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al agregar pago');
+    }
   };
 
-  const handleEliminarFactura = (facturaId) => {
+  const handleEliminarFactura = async (facturaId) => {
     const confirmar = window.confirm("¿Estás seguro de que deseas eliminar esta factura? Esta acción no se puede deshacer.");
     if (!confirmar) return;
-    setFacturas(facturas.filter(f => f.id !== facturaId));
+    
+    try {
+      await eliminarFactura(facturaId);
+      setFacturas(facturas.filter(f => f._id !== facturaId));
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar factura');
+    }
   };
   
-  const handleEliminarPago = (pagoId) => {
+  const handleEliminarPago = async (pagoId) => {
     const confirmar = window.confirm("¿Estás seguro de que deseas eliminar este pago?");
     if (!confirmar) return;
-    setPagos(pagos.filter(p => p.id !== pagoId));
+    
+    try {
+      await eliminarPago(pagoId);
+      setPagos(pagos.filter(p => p._id !== pagoId));
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al eliminar pago');
+    }
   };
 
   const handleCerrarModales = () => {
@@ -182,7 +263,7 @@ function Proveedores() {
     mouseDownInsideModal.current = false;
   };
 
-  const handleGuardarFacturaEditada = (e) => {
+  const handleGuardarFacturaEditada = async (e) => {
     e.preventDefault();
     const monto = parseFloat(itemEditando.monto);
     const rechazo = parseFloat(itemEditando.rechazo) || 0;
@@ -192,30 +273,56 @@ function Proveedores() {
       return;
     }
     
-    const facturasActualizadas = facturas.map(f => 
-      f.id === itemEditando.id 
-        ? { ...itemEditando, monto, rechazo, fechaVencimiento: itemEditando.fechaVencimiento || null }
-        : f
-    );
-    
-    setFacturas(facturasActualizadas);
-    handleCerrarModales();
+    try {
+      await editarFactura(itemEditando._id, {
+        fecha: itemEditando.fecha,
+        fechaVencimiento: itemEditando.fechaVencimiento || null,
+        numero: itemEditando.numero,
+        monto,
+        rechazo
+      });
+      
+      const facturasActualizadas = facturas.map(f => 
+        f._id === itemEditando._id 
+          ? { ...itemEditando, monto, rechazo, fechaVencimiento: itemEditando.fechaVencimiento || null }
+          : f
+      );
+      
+      setFacturas(facturasActualizadas);
+      handleCerrarModales();
+      alert('✅ Factura editada correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al editar factura');
+    }
   };
 
-  const handleGuardarPagoEditado = (e) => {
+  const handleGuardarPagoEditado = async (e) => {
     e.preventDefault();
     const monto = parseFloat(itemEditando.monto);
     if (!monto || monto <= 0) {
       alert("El Monto no puede estar vacío.");
       return;
     }
-    const pagosActualizados = pagos.map(p => 
-      p.id === itemEditando.id 
-        ? { ...itemEditando, monto } 
-        : p
-    );
-    setPagos(pagosActualizados);
-    handleCerrarModales();
+    
+    try {
+      await editarPago(itemEditando._id, {
+        fecha: itemEditando.fecha,
+        monto
+      });
+      
+      const pagosActualizados = pagos.map(p => 
+        p._id === itemEditando._id 
+          ? { ...itemEditando, monto } 
+          : p
+      );
+      setPagos(pagosActualizados);
+      handleCerrarModales();
+      alert('✅ Pago editado correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al editar pago');
+    }
   };
   
   const calcularSaldoPendiente = (proveedorId) => {
@@ -231,14 +338,11 @@ function Proveedores() {
     
     const formatearFecha = (fechaString) => {
       if (!fechaString) return '';
-      const fecha = new Date(fechaString + 'T00:00:00');
-      const dia = String(fecha.getDate()).padStart(2, '0');
-      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-      const anio = fecha.getFullYear();
-      return `${dia}/${mes}/${anio}`;
+      const [año, mes, dia] = fechaString.split('T')[0].split('-');
+      return `${dia}/${mes}/${año}`;
     };
     
-    const facturasData = facturas.filter(f => f.proveedorId === proveedorSeleccionado.id).map(f => {
+    const facturasData = facturas.filter(f => f.proveedorId === proveedorSeleccionado._id).map(f => {
       return { 
         FECHA: formatearFecha(f.fecha), 
         VENCIMIENTO: formatearFecha(f.fechaVencimiento), 
@@ -248,7 +352,7 @@ function Proveedores() {
       };
     });
     
-    const pagosData = pagos.filter(p => p.proveedorId === proveedorSeleccionado.id).map(p => {
+    const pagosData = pagos.filter(p => p.proveedorId === proveedorSeleccionado._id).map(p => {
       return { 
         FECHA: formatearFecha(p.fecha), 
         MONTO: p.monto 
@@ -275,13 +379,16 @@ function Proveedores() {
     XLSX.writeFile(wb, `Reporte_${proveedorNombre}.xlsx`);
   };
 
-  const handleFileImport = (event) => {
+  const handleFileImport = async (event) => {
     const file = event.target.files[0];
     if (!file || !proveedorSeleccionado) return;
 
     const parsearFecha = (fechaString) => {
       if (fechaString instanceof Date) {
-        return fechaString.toISOString().split('T')[0];
+        const año = fechaString.getFullYear();
+        const mes = String(fechaString.getMonth() + 1).padStart(2, '0');
+        const dia = String(fechaString.getDate()).padStart(2, '0');
+        return `${año}-${mes}-${dia}`;
       }
       if (typeof fechaString === 'string') {
         const partes = fechaString.split('/'); 
@@ -303,7 +410,7 @@ function Proveedores() {
     };
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target.result;
         const wb = XLSX.read(data, { type: 'buffer', cellDates: true });
@@ -326,8 +433,6 @@ function Proveedores() {
             const fechaParseada = parsearFecha(fechaFactura);
             if (fechaParseada) {
               nuevasFacturas.push({
-                id: Date.now() + i + 'f',
-                proveedorId: proveedorSeleccionado.id,
                 fecha: fechaParseada,
                 fechaVencimiento: parsearFecha(fechaVencimiento),
                 numero: String(numeroFactura),
@@ -343,8 +448,6 @@ function Proveedores() {
             const fechaParseada = parsearFecha(fechaPago);
             if (fechaParseada) {
               nuevosPagos.push({
-                id: Date.now() + i + 'p',
-                proveedorId: proveedorSeleccionado.id,
                 fecha: fechaParseada,
                 monto: parseFloat(montoPago),
               });
@@ -357,8 +460,14 @@ function Proveedores() {
         );
         
         if (confirmar) {
-          setFacturas(facturasActuales => [...facturasActuales, ...nuevasFacturas]);
-          setPagos(pagosActuales => [...pagosActuales, ...nuevosPagos]);
+          for (const factura of nuevasFacturas) {
+            const facturaCreada = await agregarFactura(proveedorSeleccionado._id, factura);
+            setFacturas(facturasActuales => [...facturasActuales, facturaCreada]);
+          }
+          for (const pago of nuevosPagos) {
+            const pagoCreado = await agregarPago(proveedorSeleccionado._id, pago);
+            setPagos(pagosActuales => [...pagosActuales, pagoCreado]);
+          }
           alert("¡Datos importados con éxito!");
         }
       } catch (error) {
@@ -370,6 +479,14 @@ function Proveedores() {
     event.target.value = null; 
     reader.readAsArrayBuffer(file);
   };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <p>Cargando proveedores...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -383,11 +500,11 @@ function Proveedores() {
       <h2>Lista de Proveedores</h2>
       <div className="lista-container">
         {proveedores.map(proveedor => {
-          const saldo = calcularSaldoPendiente(proveedor.id);
+          const saldo = calcularSaldoPendiente(proveedor._id);
           const claseSaldo = saldo > 0 ? 'total' : 'total positivo';
           return (
-            <div key={proveedor.id} className="card" style={{cursor: 'pointer', position: 'relative'}}>
-              <button onClick={(e) => { e.stopPropagation(); handleEliminarProveedor(proveedor.id); }} style={{ position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
+            <div key={proveedor._id} className="card" style={{cursor: 'pointer', position: 'relative'}}>
+              <button onClick={(e) => { e.stopPropagation(); handleEliminarProveedor(proveedor._id); }} style={{ position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}>
                 X
               </button>
               <div onClick={() => handleCardClick(proveedor)}>
@@ -424,8 +541,8 @@ function Proveedores() {
           </div>
 
           <h3> Saldo Pendiente Total: 
-            <span className={calcularSaldoPendiente(proveedorSeleccionado.id) > 0 ? 'total' : 'total positivo'} style={{fontSize: '1.5rem', marginLeft: '1rem'}}>
-              ${calcularSaldoPendiente(proveedorSeleccionado.id).toLocaleString('es-AR')}
+            <span className={calcularSaldoPendiente(proveedorSeleccionado._id) > 0 ? 'total' : 'total positivo'} style={{fontSize: '1.5rem', marginLeft: '1rem'}}>
+              ${calcularSaldoPendiente(proveedorSeleccionado._id).toLocaleString('es-AR')}
             </span>
           </h3>
           <hr style={{margin: '2rem 0'}} />
@@ -459,13 +576,13 @@ function Proveedores() {
                 </thead>
                 <tbody>
                   {facturas
-                    .filter(f => f.proveedorId === proveedorSeleccionado.id)
+                    .filter(f => f.proveedorId === proveedorSeleccionado._id)
                     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                     .map(factura => (
-                      <tr key={factura.id}>
-                        <td>{new Date(factura.fecha + 'T00:00:00').toLocaleDateString('es-AR')}</td>
+                      <tr key={factura._id}>
+                        <td>{formatearFechaLocal(factura.fecha)}</td>
                         <td style={{color: 'red', fontWeight: '600'}}>
-                          {factura.fechaVencimiento ? new Date(factura.fechaVencimiento + 'T00:00:00').toLocaleDateString('es-AR') : 'N/A'}
+                          {factura.fechaVencimiento ? formatearFechaLocal(factura.fechaVencimiento) : 'N/A'}
                         </td>
                         <td>{factura.numero}</td>
                         <td>${factura.monto.toLocaleString('es-AR')}</td>
@@ -480,7 +597,7 @@ function Proveedores() {
                             Editar
                           </button>
                           <button 
-                            onClick={() => handleEliminarFactura(factura.id)} 
+                            onClick={() => handleEliminarFactura(factura._id)} 
                             className="btn-eliminar"
                           >
                             X
@@ -511,11 +628,11 @@ function Proveedores() {
                 </thead>
                 <tbody>
                   {pagos
-                    .filter(p => p.proveedorId === proveedorSeleccionado.id)
+                    .filter(p => p.proveedorId === proveedorSeleccionado._id)
                     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                     .map(pago => (
-                      <tr key={pago.id}>
-                        <td>{new Date(pago.fecha + 'T00:00:00').toLocaleDateString('es-AR')}</td>
+                      <tr key={pago._id}>
+                        <td>{formatearFechaLocal(pago.fecha)}</td>
                         <td>${pago.monto.toLocaleString('es-AR')}</td>
                         <td className="tabla-acciones">
                           <button 
@@ -525,7 +642,7 @@ function Proveedores() {
                             Editar
                           </button>
                           <button 
-                            onClick={() => handleEliminarPago(pago.id)} 
+                            onClick={() => handleEliminarPago(pago._id)} 
                             className="btn-eliminar"
                           >
                             X
@@ -554,10 +671,10 @@ function Proveedores() {
             <h2>Editar Factura</h2>
             <form onSubmit={handleGuardarFacturaEditada} className="form-container" style={{flexDirection: 'column'}}>
               <label>Fecha</label>
-              <input type="date" name="fecha" value={itemEditando.fecha} onChange={handleEdicionChange} />
+              <input type="date" name="fecha" value={itemEditando.fecha?.split('T')[0] || ''} onChange={handleEdicionChange} />
               
               <label>Fecha Vencimiento (opcional)</label>
-              <input type="date" name="fechaVencimiento" value={itemEditando.fechaVencimiento || ''} onChange={handleEdicionChange} />
+              <input type="date" name="fechaVencimiento" value={itemEditando.fechaVencimiento?.split('T')[0] || ''} onChange={handleEdicionChange} />
 
               <label>N° Factura</label>
               <input type="text" name="numero" value={itemEditando.numero} onChange={handleEdicionChange} placeholder="N° de Factura" />
@@ -584,7 +701,7 @@ function Proveedores() {
             <h2>Editar Pago</h2>
             <form onSubmit={handleGuardarPagoEditado} className="form-container" style={{flexDirection: 'column'}}>
               <label>Fecha</label>
-              <input type="date" name="fecha" value={itemEditando.fecha} onChange={handleEdicionChange} />
+              <input type="date" name="fecha" value={itemEditando.fecha?.split('T')[0] || ''} onChange={handleEdicionChange} />
               <label>Monto</label>
               <input type="number" step="0.01" min="0" name="monto" value={itemEditando.monto} onChange={handleEdicionChange} placeholder="Monto del pago" />
               <div className="modal-actions">
