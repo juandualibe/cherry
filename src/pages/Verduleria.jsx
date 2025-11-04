@@ -374,30 +374,40 @@ function Verduleria() {
   };
 
   const handleGuardarGastosFijos = async (e) => {
-    e.preventDefault();
-
-    try {
-      for (const gasto of gastosEditando) {
-        await editarGasto(gasto._id, {
+  e.preventDefault();
+  
+  // ✅ Cerrar el modal INMEDIATAMENTE
+  handleCerrarModales();
+  
+  // ✅ Actualizar el estado local INMEDIATAMENTE (feedback visual instantáneo)
+  const gastosActualizados = gastosFijos.map(g => {
+    const gastoEditado = gastosEditando.find(ge => ge._id === g._id);
+    return gastoEditado ? gastoEditado : g;
+  });
+  setGastosFijos(gastosActualizados);
+  
+  // 🌐 Guardar en el servidor en background
+  try {
+    // Usar Promise.all para hacerlo en paralelo (más rápido)
+    await Promise.all(
+      gastosEditando.map(gasto => 
+        editarGasto(gasto._id, {
           total: parseFloat(gasto.total) || 0,
           porcentaje: parseFloat(gasto.porcentaje) || 0,
-          verduleria: parseFloat(gasto.verduleria) || 0,
-        });
-      }
-
-      const gastosActualizados = gastosFijos.map((g) => {
-        const gastoEditado = gastosEditando.find((ge) => ge._id === g._id);
-        return gastoEditado ? gastoEditado : g;
-      });
-
-      setGastosFijos(gastosActualizados);
-      handleCerrarModales(); // ← YA ESTÁ AQUÍ ✅
-      alert("✅ Gastos actualizados correctamente");
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Error al guardar gastos");
-    }
-  };
+          verduleria: parseFloat(gasto.verduleria) || 0
+        })
+      )
+    );
+    
+    // ✅ Mostrar confirmación cuando termine de sincronizar
+    console.log('✅ Gastos sincronizados con el servidor');
+  } catch (error) {
+    console.error('Error:', error);
+    alert('⚠️ Los cambios se guardaron localmente pero hubo un error al sincronizar con el servidor. Recarga la página.');
+    // Recargar datos del servidor para estar seguros
+    await cargarDatosMes(mesSeleccionado.mesId);
+  }
+};
 
   // --- Cálculos y Estadísticas ---
 
