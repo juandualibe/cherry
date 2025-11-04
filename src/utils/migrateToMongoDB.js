@@ -1,6 +1,6 @@
 // src/utils/migrateToMongoDB.js
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://wrong-devonna-dualibesoft-528f87f1.koyeb.app/api';
 
 export const migrarLocalStorageAMongoDB = async () => {
   try {
