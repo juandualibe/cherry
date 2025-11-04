@@ -9,7 +9,7 @@ import {
   obtenerDeudasCliente,
   agregarDeuda,
   eliminarDeuda,
-  editarDeuda  // ← AGREGÁ ESTA LÍNEA
+  editarDeuda
 } from '../services/api';
 
 // --- Función para obtener fecha local (sin UTC) ---
@@ -191,31 +191,30 @@ function Clientes() {
   };
 
   const handleGuardarDeudaEditada = async (e) => {
-  e.preventDefault();
-  const monto = parseFloat(itemEditando.monto);
-  if (!monto || monto <= 0) {
-    alert("El Monto no puede estar vacío.");
-    return;
-  }
+    e.preventDefault();
+    const monto = parseFloat(itemEditando.monto);
+    if (!monto || monto <= 0) {
+      alert("El Monto no puede estar vacío.");
+      return;
+    }
 
-  try {
-    // Importá editarDeuda al inicio del archivo
-    await editarDeuda(itemEditando._id, itemEditando.fecha, monto);
-    
-    const deudasActualizadas = deudas.map(d => 
-      d._id === itemEditando._id 
-        ? { ...itemEditando, monto } 
-        : d
-    );
-    
-    setDeudas(deudasActualizadas);
-    handleCerrarModales();
-    alert('✅ Deuda editada correctamente');
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Error al editar deuda');
-  }
-};
+    try {
+      await editarDeuda(itemEditando._id, itemEditando.fecha, monto);
+      
+      const deudasActualizadas = deudas.map(d => 
+        d._id === itemEditando._id 
+          ? { ...itemEditando, monto } 
+          : d
+      );
+      
+      setDeudas(deudasActualizadas);
+      handleCerrarModales();
+      alert('✅ Deuda editada correctamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al editar deuda');
+    }
+  };
 
   const handleExportarDeudas = () => {
     const formatearFecha = (fechaString) => {
@@ -343,6 +342,16 @@ function Clientes() {
     event.target.value = null; 
     reader.readAsArrayBuffer(file);
   };
+
+  const handleAgregarNuevaDeuda = () => {
+    setNombreCliente(clienteSeleccionado.nombre);
+    setFechaDeuda(obtenerFechaLocal());
+    setMontoDeuda('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      document.querySelector('input[type="number"][placeholder="Monto de la deuda"]')?.focus();
+    }, 500);
+  };
   
   if (loading) {
     return (
@@ -463,10 +472,28 @@ function Clientes() {
       {/* DETALLE DEL CLIENTE */}
       {clienteSeleccionado && (
         <div style={{marginTop: '3rem', padding: '1.5rem', background: '#fff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)'}}>
-          <h2>Historial de Deudas: {clienteSeleccionado.nombre}</h2>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+            <h2>Historial de Deudas: {clienteSeleccionado.nombre}</h2>
+            <button 
+              className="btn" 
+              onClick={handleAgregarNuevaDeuda}
+              style={{backgroundColor: '#28a745'}}
+            >
+              + Agregar Nueva Deuda
+            </button>
+          </div>
 
           {deudasDelClienteSeleccionado.length === 0 ? (
-            <p>Este cliente no tiene deudas registradas.</p>
+            <div style={{textAlign: 'center', padding: '2rem', background: '#f8f9fa', borderRadius: '8px'}}>
+              <p style={{marginBottom: '1rem'}}>Este cliente no tiene deudas registradas.</p>
+              <button 
+                className="btn" 
+                onClick={handleAgregarNuevaDeuda}
+                style={{backgroundColor: '#28a745'}}
+              >
+                Registrar Primera Deuda
+              </button>
+            </div>
           ) : (
             <>
               <table className="tabla-detalles">
