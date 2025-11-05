@@ -8,8 +8,9 @@ import {
   obtenerProveedores,
   agregarProductoOrden,
   eliminarProductoOrden,
-  actualizarOrden
+  escanearCodigo
 } from '../services/api';
+import EscanerBarras from '../components/EscanerBarras';
 
 const formatearFechaLocal = (fechaString) => {
   if (!fechaString) return '';
@@ -31,6 +32,10 @@ function DetalleOrden() {
   const [codigoBarras, setCodigoBarras] = useState('');
   const [cantidad, setCantidad] = useState('');
   const [precio, setPrecio] = useState('');
+
+  // Estados para escáner
+  const [escaneadorAbierto, setEscaneadorAbierto] = useState(false);
+  const [ultimoEscaneo, setUltimoEscaneo] = useState(null);
 
   useEffect(() => {
     cargarDatos();
@@ -115,6 +120,53 @@ function DetalleOrden() {
     } catch (error) {
       console.error('Error:', error);
       alert('Error al eliminar producto');
+    }
+  };
+
+  const handleEscanear = async (codigoBarras) => {
+    try {
+      const resultado = await escanearCodigo(ordenId, codigoBarras);
+      
+      // Actualizar el producto en la lista
+      const productosActualizados = productos.map(p => 
+        p._id === resultado.producto._id ? resultado.producto : p
+      );
+      setProductos(productosActualizados);
+      
+      // Mostrar mensaje de éxito
+      setUltimoEscaneo({
+        tipo: 'success',
+        mensaje: resultado.mensaje,
+        producto: resultado.producto.nombre
+      });
+      
+      // Reproducir sonido de éxito
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Lz/LUfjAGGm7A7+OZRQ4PVKrk7q5aGAg+ltryxnMpBSh+zPDajz4KFV627eeXSg0NUKXi8LZmHggykNXwzH4yBh1wwO7mnEgPC1Kn4e+zYBoGNI/U8Mp8MwUdbL/v5Z1LDwxPpeLvtmcdBzKN0/DLfDQGHm2+7uScTBAMTqPh8LhnHwcxjNLwyH02Bx9rv+7km04QDE+k4O+2aB8HMIrP8Md+Nwgfar3t5JxPEAxOpN/vt2kgCDCJzvDHfjcIH2m77OScUBALTaPf77dpIQgviM3vxn45CB9ou+zknFARC0yi3u+4aiIILofM78Z/Ogkfabvs5ZxRDw==');
+      audio.play().catch(e => console.log('Audio no disponible'));
+      
+      // Limpiar mensaje después de 3 segundos
+      setTimeout(() => setUltimoEscaneo(null), 3000);
+      
+      // Recargar orden para actualizar totales
+      const ordenActualizada = await obtenerOrden(ordenId);
+      setOrden(ordenActualizada);
+      
+    } catch (error) {
+      console.error('Error al escanear:', error);
+      
+      // Mostrar alerta de error
+      setUltimoEscaneo({
+        tipo: 'error',
+        mensaje: error.error || 'Producto no encontrado en esta orden',
+        codigo: error.codigoBarras || codigoBarras
+      });
+      
+      // Reproducir sonido de error
+      const audioError = new Audio('data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//');
+      audioError.play().catch(e => console.log('Audio no disponible'));
+      
+      // Limpiar mensaje después de 3 segundos
+      setTimeout(() => setUltimoEscaneo(null), 3000);
     }
   };
 
@@ -297,7 +349,8 @@ function DetalleOrden() {
         background: '#fff',
         padding: '1.5rem',
         borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        marginBottom: '2rem'
       }}>
         <h3 style={{ marginTop: 0 }}>Productos ({productos.length})</h3>
         
@@ -338,7 +391,8 @@ function DetalleOrden() {
                       borderRadius: '8px',
                       fontSize: '0.85rem',
                       backgroundColor: producto.recibido ? '#d4edda' : '#fff3cd',
-                      color: producto.recibido ? '#155724' : '#856404'
+                      color: producto.recibido ? '#155724' : '#856404',
+                      fontWeight: '600'
                     }}>
                       {producto.cantidadRecibida}/{producto.cantidadPedida}
                     </span>
@@ -358,24 +412,63 @@ function DetalleOrden() {
         )}
       </div>
 
-      {/* BOTÓN ESCANEAR (próximamente) */}
+      {/* BOTÓN ESCANEAR Y ALERTAS */}
       {productos.length > 0 && (
-        <div style={{
-          marginTop: '2rem',
-          textAlign: 'center'
-        }}>
-          <button
-            className="btn"
-            style={{
-              backgroundColor: '#28a745',
+        <>
+          {/* Mensaje de último escaneo */}
+          {ultimoEscaneo && (
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1.5rem',
+              borderRadius: '12px',
+              textAlign: 'center',
               fontSize: '1.1rem',
-              padding: '1rem 2rem'
-            }}
-            onClick={() => alert('📷 El escáner se agregará en el siguiente paso')}
-          >
-            📷 Escanear Productos
-          </button>
-        </div>
+              fontWeight: '600',
+              backgroundColor: ultimoEscaneo.tipo === 'success' ? '#d4edda' : '#f8d7da',
+              color: ultimoEscaneo.tipo === 'success' ? '#155724' : '#721c24',
+              border: `3px solid ${ultimoEscaneo.tipo === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              animation: 'pulse 0.5s ease'
+            }}>
+              {ultimoEscaneo.tipo === 'success' ? '✅' : '❌'} {ultimoEscaneo.mensaje}
+              {ultimoEscaneo.codigo && (
+                <div style={{ fontSize: '0.9rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
+                  Código: {ultimoEscaneo.codigo}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botón escanear */}
+          <div style={{
+            textAlign: 'center'
+          }}>
+            <button
+              className="btn"
+              style={{
+                backgroundColor: '#28a745',
+                fontSize: '1.2rem',
+                padding: '1.25rem 2.5rem',
+                fontWeight: '700',
+                boxShadow: '0 4px 12px rgba(40, 167, 69, 0.3)'
+              }}
+              onClick={() => setEscaneadorAbierto(true)}
+            >
+              📷 Escanear Productos
+            </button>
+          </div>
+
+          {/* Modal del escáner */}
+          {escaneadorAbierto && (
+            <EscanerBarras
+              onScan={(codigo) => {
+                handleEscanear(codigo);
+                // No cerramos el escáner para poder seguir escaneando
+              }}
+              onClose={() => setEscaneadorAbierto(false)}
+            />
+          )}
+        </>
       )}
     </div>
   );
