@@ -8,6 +8,7 @@ import Inicio from './pages/Inicio.jsx';
 import Clientes from './pages/Clientes.jsx';
 import Proveedores from './pages/Proveedores.jsx';
 import Verduleria from './pages/Verduleria.jsx';
+import OrdenesCompra from './pages/OrdenesCompra';
 
 function App() {
   return (
@@ -16,11 +17,12 @@ function App() {
         <Navegacion />
         <div className="main-wrapper">
           <main className="page-content">
-            <Routes>
+            <Routes>              
               <Route path="/" element={<Inicio />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/verduleria" element={<Verduleria />} />
+              <Route path="/ordenes" element={<OrdenesCompra />} />
             </Routes>
           </main>
         </div>        

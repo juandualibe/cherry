@@ -249,3 +249,102 @@ export const eliminarGasto = async (gastoId) => {
   if (!response.ok) throw new Error('Error al eliminar gasto');
   return await response.json();
 };
+
+// ==================== ÓRDENES DE COMPRA ====================
+
+// Obtener todas las órdenes
+export const obtenerOrdenes = async () => {
+  const response = await fetch(`${API_URL}/ordenes`);
+  if (!response.ok) throw new Error('Error al obtener órdenes');
+  return await response.json();
+};
+
+// Obtener una orden específica
+export const obtenerOrden = async (ordenId) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}`);
+  if (!response.ok) throw new Error('Error al obtener orden');
+  return await response.json();
+};
+
+// Crear nueva orden
+export const crearOrden = async (proveedorId, fecha, observaciones = '') => {
+  const response = await fetch(`${API_URL}/ordenes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ proveedorId, fecha, observaciones }),
+  });
+  if (!response.ok) throw new Error('Error al crear orden');
+  return await response.json();
+};
+
+// Actualizar orden
+export const actualizarOrden = async (ordenId, datos) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  });
+  if (!response.ok) throw new Error('Error al actualizar orden');
+  return await response.json();
+};
+
+// Eliminar orden
+export const eliminarOrden = async (ordenId) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Error al eliminar orden');
+  return await response.json();
+};
+
+// Obtener productos de una orden
+export const obtenerProductosOrden = async (ordenId) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}/productos`);
+  if (!response.ok) throw new Error('Error al obtener productos');
+  return await response.json();
+};
+
+// Agregar producto a orden
+export const agregarProductoOrden = async (ordenId, producto) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}/productos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(producto),
+  });
+  if (!response.ok) throw new Error('Error al agregar producto');
+  return await response.json();
+};
+
+// Actualizar producto
+export const actualizarProductoOrden = async (productoId, datos) => {
+  const response = await fetch(`${API_URL}/ordenes/productos/${productoId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  });
+  if (!response.ok) throw new Error('Error al actualizar producto');
+  return await response.json();
+};
+
+// Eliminar producto
+export const eliminarProductoOrden = async (productoId) => {
+  const response = await fetch(`${API_URL}/ordenes/productos/${productoId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Error al eliminar producto');
+  return await response.json();
+};
+
+// Escanear código de barras
+export const escanearCodigo = async (ordenId, codigoBarras) => {
+  const response = await fetch(`${API_URL}/ordenes/${ordenId}/escanear`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigoBarras }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw { ...data, status: response.status };
+  }
+  return data;
+};
