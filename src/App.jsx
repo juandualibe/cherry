@@ -9,6 +9,7 @@ import Clientes from './pages/Clientes.jsx';
 import Proveedores from './pages/Proveedores.jsx';
 import Verduleria from './pages/Verduleria.jsx';
 import OrdenesCompra from './pages/OrdenesCompra';
+import DetalleOrden from './pages/DetalleOrden';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/verduleria" element={<Verduleria />} />
               <Route path="/ordenes" element={<OrdenesCompra />} />
+              <Route path="/ordenes/:ordenId" element={<DetalleOrden />} />
             </Routes>
           </main>
         </div>        
