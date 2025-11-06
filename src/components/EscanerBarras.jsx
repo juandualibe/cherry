@@ -5,46 +5,44 @@ import { Html5Qrcode } from 'html5-qrcode';
 
 function EscanerBarras({ onScan, onClose }) {
   const html5QrCodeRef = useRef(null);
-  const [escaneando, setEscaneando] = useState(false);
   const [error, setError] = useState('');
   const [ultimoMensaje, setUltimoMensaje] = useState('');
   const ultimoCodigoProcesado = useRef(null);
   const timeoutProcesamiento = useRef(null);
+  const montadoRef = useRef(false);
 
   useEffect(() => {
+    // Evitar doble inicialización (React StrictMode)
+    if (montadoRef.current) return;
+    montadoRef.current = true;
+
     const iniciarEscaner = async () => {
       try {
         const html5QrCode = new Html5Qrcode("reader");
         html5QrCodeRef.current = html5QrCode;
         
         const config = {
-          fps: 15, // Aumentamos FPS para más fluidez
-          qrbox: { width: 280, height: 180 }, // Área más grande
+          fps: 15,
+          qrbox: { width: 280, height: 180 },
           aspectRatio: 1.777778,
           disableFlip: false
         };
 
         await html5QrCode.start(
-          { facingMode: "environment" }, // Cámara trasera
+          { facingMode: "environment" },
           config,
-          (decodedText, decodedResult) => {
-            // Evitar procesar el mismo código en los últimos 2 segundos
+          (decodedText) => {
             if (ultimoCodigoProcesado.current === decodedText) {
               return;
             }
 
-            // Marcar como procesado
             ultimoCodigoProcesado.current = decodedText;
-            
-            // Mostrar feedback visual
             setUltimoMensaje(`✓ Escaneado: ${decodedText.substring(0, 13)}`);
 
-            // Llamar al callback
             if (onScan) {
               onScan(decodedText);
             }
 
-            // Limpiar después de 2 segundos para permitir el mismo código de nuevo
             if (timeoutProcesamiento.current) {
               clearTimeout(timeoutProcesamiento.current);
             }
@@ -54,12 +52,8 @@ function EscanerBarras({ onScan, onClose }) {
               setUltimoMensaje('');
             }, 2000);
           },
-          (errorMessage) => {
-            // Error silencioso (sigue buscando)
-          }
+          () => {} // Error silencioso
         );
-
-        setEscaneando(true);
       } catch (err) {
         console.error("Error al iniciar escáner:", err);
         setError('No se pudo acceder a la cámara. Verifica los permisos.');
@@ -68,33 +62,36 @@ function EscanerBarras({ onScan, onClose }) {
 
     iniciarEscaner();
 
-    // Cleanup al desmontar
     return () => {
       if (timeoutProcesamiento.current) {
         clearTimeout(timeoutProcesamiento.current);
       }
       
       if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop()
-          .then(() => {
-            html5QrCodeRef.current = null;
-          })
-          .catch(err => console.error("Error al detener escáner:", err));
+        try {
+          html5QrCodeRef.current.stop().catch(() => {});
+          html5QrCodeRef.current = null;
+        } catch (e) {}
       }
+      montadoRef.current = false;
     };
-  }, []);
+  }, [onScan]);
 
-  const handleClose = async () => {
-    // Detener el escáner antes de cerrar
+  const handleClose = () => {
     if (html5QrCodeRef.current) {
       try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current = null;
+        html5QrCodeRef.current.stop()
+          .catch(() => {})
+          .finally(() => {
+            html5QrCodeRef.current = null;
+            onClose();
+          });
       } catch (e) {
-        console.error('Error al detener:', e);
+        onClose();
       }
+    } else {
+      onClose();
     }
-    onClose();
   };
 
   return (
@@ -126,7 +123,6 @@ function EscanerBarras({ onScan, onClose }) {
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
         }}
       >
-        {/* Header fijo */}
         <div style={{
           padding: '1rem',
           borderBottom: '2px solid #e0e0e0',
@@ -139,7 +135,6 @@ function EscanerBarras({ onScan, onClose }) {
           </h2>
         </div>
 
-        {/* Contenido */}
         <div style={{
           padding: '1rem',
           flex: 1,
@@ -175,7 +170,6 @@ function EscanerBarras({ onScan, onClose }) {
             }}
           ></div>
 
-          {/* Feedback visual */}
           {ultimoMensaje && (
             <div style={{
               padding: '0.5rem 1rem',
@@ -203,7 +197,6 @@ function EscanerBarras({ onScan, onClose }) {
           </p>
         </div>
 
-        {/* Footer fijo */}
         <div style={{
           padding: '1rem',
           borderTop: '2px solid #e0e0e0',
