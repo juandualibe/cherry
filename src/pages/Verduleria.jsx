@@ -1,5 +1,3 @@
-// src/pages/Verduleria.jsx
-
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -51,18 +49,8 @@ const obtenerDiaSemana = (fechaString) => {
 // --- Función para formatear mes a texto ---
 const formatearMesTexto = (mesString) => {
   const meses = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
   ];
   const [año, mes] = mesString.split("-");
   return `${meses[parseInt(mes) - 1]} ${año}`;
@@ -210,12 +198,20 @@ function Verduleria() {
 
   const handleAgregarVenta = async (e) => {
     e.preventDefault();
-    const costo = parseFloat(costoMerc);
-    const gastos = parseFloat(gastosVenta);
-    const venta = parseFloat(montoVenta);
 
-    if (!costo || !gastos || !venta || !mesSeleccionado) {
-      alert("Por favor, completa todos los campos");
+    // ✅ Permitir 0, solo validar que NO sean null/undefined/string vacía
+    const costo = costoMerc === "" ? 0 : parseFloat(costoMerc);
+    const gastos = gastosVenta === "" ? 0 : parseFloat(gastosVenta);
+    const venta = montoVenta === "" ? 0 : parseFloat(montoVenta);
+
+    if (!mesSeleccionado) {
+      alert("Por favor, selecciona un mes primero");
+      return;
+    }
+
+    // ✅ Validar que al menos haya ALGÚN valor (no todo en 0)
+    if (costo === 0 && gastos === 0 && venta === 0) {
+      alert("Debe haber al menos un valor distinto de cero");
       return;
     }
 
@@ -374,40 +370,42 @@ function Verduleria() {
   };
 
   const handleGuardarGastosFijos = async (e) => {
-  e.preventDefault();
-  
-  // ✅ Cerrar el modal INMEDIATAMENTE
-  handleCerrarModales();
-  
-  // ✅ Actualizar el estado local INMEDIATAMENTE (feedback visual instantáneo)
-  const gastosActualizados = gastosFijos.map(g => {
-    const gastoEditado = gastosEditando.find(ge => ge._id === g._id);
-    return gastoEditado ? gastoEditado : g;
-  });
-  setGastosFijos(gastosActualizados);
-  
-  // 🌐 Guardar en el servidor en background
-  try {
-    // Usar Promise.all para hacerlo en paralelo (más rápido)
-    await Promise.all(
-      gastosEditando.map(gasto => 
-        editarGasto(gasto._id, {
-          total: parseFloat(gasto.total) || 0,
-          porcentaje: parseFloat(gasto.porcentaje) || 0,
-          verduleria: parseFloat(gasto.verduleria) || 0
-        })
-      )
-    );
-    
-    // ✅ Mostrar confirmación cuando termine de sincronizar
-    console.log('✅ Gastos sincronizados con el servidor');
-  } catch (error) {
-    console.error('Error:', error);
-    alert('⚠️ Los cambios se guardaron localmente pero hubo un error al sincronizar con el servidor. Recarga la página.');
-    // Recargar datos del servidor para estar seguros
-    await cargarDatosMes(mesSeleccionado.mesId);
-  }
-};
+    e.preventDefault();
+
+    // ✅ Cerrar el modal INMEDIATAMENTE
+    handleCerrarModales();
+
+    // ✅ Actualizar el estado local INMEDIATAMENTE (feedback visual instantáneo)
+    const gastosActualizados = gastosFijos.map((g) => {
+      const gastoEditado = gastosEditando.find((ge) => ge._id === g._id);
+      return gastoEditado ? gastoEditado : g;
+    });
+    setGastosFijos(gastosActualizados);
+
+    // 🌐 Guardar en el servidor en background
+    try {
+      // Usar Promise.all para hacerlo en paralelo (más rápido)
+      await Promise.all(
+        gastosEditando.map((gasto) =>
+          editarGasto(gasto._id, {
+            total: parseFloat(gasto.total) || 0,
+            porcentaje: parseFloat(gasto.porcentaje) || 0,
+            verduleria: parseFloat(gasto.verduleria) || 0,
+          })
+        )
+      );
+
+      // ✅ Mostrar confirmación cuando termine de sincronizar
+      console.log("✅ Gastos sincronizados con el servidor");
+    } catch (error) {
+      console.error("Error:", error);
+      alert(
+        "⚠️ Los cambios se guardaron localmente pero hubo un error al sincronizar con el servidor. Recarga la página."
+      );
+      // Recargar datos del servidor para estar seguros
+      await cargarDatosMes(mesSeleccionado.mesId);
+    }
+  };
 
   // --- Cálculos y Estadísticas ---
 
@@ -908,26 +906,26 @@ function Verduleria() {
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={costoMerc}
                 onChange={(e) => setCostoMerc(e.target.value)}
-                placeholder="Costo Merc."
-                required
+                placeholder="Costo Merc. (opcional)"
               />
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={gastosVenta}
                 onChange={(e) => setGastosVenta(e.target.value)}
-                placeholder="Gastos"
-                required
+                placeholder="Gastos (opcional)"
               />
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={montoVenta}
                 onChange={(e) => setMontoVenta(e.target.value)}
-                placeholder="Venta"
-                required
+                placeholder="Venta (opcional)"
               />
               <button
                 type="submit"

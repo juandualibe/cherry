@@ -1,5 +1,3 @@
-// src/pages/Inicio.jsx
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -8,6 +6,7 @@ import {
   obtenerPagosProveedor,
 } from "../services/api";
 import * as XLSX from "xlsx";
+import { formatearFechaLocal } from "../utils/dateUtils";
 
 const calcularSaldoPendiente = (
   proveedorId,
@@ -27,12 +26,6 @@ const calcularSaldoPendiente = (
     .reduce((total, p) => total + p.monto, 0);
 
   return totalFacturas - totalRechazos - totalPagos;
-};
-
-const formatearFechaLocal = (fechaString) => {
-  if (!fechaString) return "";
-  const [año, mes, dia] = fechaString.split("T")[0].split("-");
-  return `${dia}/${mes}/${año}`;
 };
 
 const hoy = new Date();

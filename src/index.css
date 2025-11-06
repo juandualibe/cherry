@@ -99,7 +99,6 @@ body {
   width: 100%;
 }
 
-
 /* ========================================
    NAVEGACIÓN
    ======================================== */
@@ -281,7 +280,6 @@ p {
   transform: none;
 }
 
-/* Variantes de botones */
 .btn-success {
   background-color: var(--color-success);
 }
@@ -315,7 +313,6 @@ p {
   background-color: var(--color-gray-600);
 }
 
-/* Botones pequeños */
 .btn-sm {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -428,7 +425,7 @@ p {
   border-bottom: 1px solid var(--color-gray-200);
   color: var(--color-text-primary);
   font-size: 0.95rem;
-  vertical-align: middle; /* <-- AÑADIDO */
+  vertical-align: middle;
 }
 
 .tabla-detalles tbody tr {
@@ -443,35 +440,31 @@ p {
   border-bottom: none;
 }
 
-/* Contenedor de botones en tablas - FIX IMPORTANTE */
 .tabla-detalles td[style*="display: flex"] {
-  display: table-cell !important; /* <-- Forzar table-cell */
+  display: table-cell !important;
 }
 
-/* Botones dentro de tablas */
 .tabla-detalles button {
   padding: 0.5rem 0.875rem;
   font-size: 0.875rem;
   border-radius: var(--border-radius-sm);
   font-weight: 600;
-  cursor: pointer; /* <-- AÑADIDO */
-  pointer-events: auto; /* <-- AÑADIDO */
-  position: relative; /* <-- AÑADIDO */
-  z-index: 1; /* <-- AÑADIDO */
-  display: inline-block; /* <-- CAMBIADO de flex a inline-block */
-  margin-right: 0.5rem; /* <-- Para separación entre botones */
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  margin-right: 0.5rem;
 }
 
 .tabla-detalles button:last-child {
   margin-right: 0;
 }
 
-/* Celda de acciones */
 .tabla-acciones {
   white-space: nowrap;
 }
 
-/* Botones específicos de tablas */
 .btn-editar {
   background: #007aff !important;
   color: white !important;
@@ -607,62 +600,6 @@ p {
 .mt-4 { margin-top: var(--spacing-lg); }
 
 /* ========================================
-   RESPONSIVE
-   ======================================== */
-@media (max-width: 768px) {
-  .page-content {
-    padding: var(--spacing-md);
-  }
-  
-  .navegacion {
-    padding: var(--spacing-sm) var(--spacing-md);
-  }
-  
-  .navegacion ul {
-    gap: var(--spacing-sm);
-  }
-  
-  .navegacion a {
-    font-size: 0.875rem;
-    padding: var(--spacing-xs) var(--spacing-sm);
-  }
-  
-  h1 {
-    font-size: 1.75rem;
-  }
-  
-  h2 {
-    font-size: 1.5rem;
-  }
-  
-  .form-container {
-    padding: var(--spacing-lg);
-  }
-  
-  .form-container input {
-    min-width: 100%;
-  }
-  
-  .lista-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .modal-content {
-    width: 95%;
-    padding: var(--spacing-lg);
-  }
-  
-  .tabla-detalles {
-    font-size: 0.875rem;
-  }
-  
-  .tabla-detalles th,
-  .tabla-detalles td {
-    padding: var(--spacing-sm);
-  }
-}
-
-/* ========================================
    ANIMACIONES Y EFECTOS
    ======================================== */
 @keyframes pulse {
@@ -678,13 +615,11 @@ p {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Efecto de enfoque para accesibilidad */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-/* Scrollbar personalizada (Webkit) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -746,7 +681,6 @@ p {
   width: 80px;
 }
 
-/* Header del Sidebar */
 .sidebar-header {
   padding: var(--spacing-xl);
   display: flex;
@@ -754,14 +688,14 @@ p {
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   min-height: 70px;
-  position: relative; /* <-- AÑADIDO */
+  position: relative;
 }
 
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  flex: 1; /* <-- AÑADIDO para que ocupe espacio */
+  flex: 1;
 }
 
 .logo-icon {
@@ -793,23 +727,22 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative; /* <-- AÑADIDO */
-  z-index: 10; /* <-- AÑADIDO para que siempre esté encima */
+  position: relative;
+  z-index: 10;
 }
 
 .sidebar-toggle:hover {
   background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.1); /* <-- AÑADIDO para mejor feedback visual */
+  transform: scale(1.1);
 }
 
 .sidebar-toggle:active {
-  transform: scale(0.95); /* <-- AÑADIDO */
+  transform: scale(0.95);
 }
 
-/* Cuando el sidebar está colapsado, centrar el botón */
 .sidebar.collapsed .sidebar-header {
   justify-content: center;
-  padding: var(--spacing-lg); /* <-- Reducir padding cuando está colapsado */
+  padding: var(--spacing-lg);
 }
 
 .sidebar.collapsed .sidebar-logo {
@@ -819,15 +752,14 @@ p {
 .sidebar.collapsed .sidebar-toggle {
   position: absolute;
   right: 50%;
-  transform: translateX(50%); /* <-- Centrar el botón */
-  margin-top: 4rem; /* <-- Moverlo abajo del ícono */
+  transform: translateX(50%);
+  margin-top: 4rem;
 }
 
 .sidebar.collapsed .sidebar-toggle:hover {
-  transform: translateX(50%) scale(1.1); /* <-- Mantener centrado al hacer hover */
+  transform: translateX(50%) scale(1.1);
 }
 
-/* Navegación del Sidebar */
 .sidebar-nav {
   flex: 1;
   padding: var(--spacing-lg) 0;
@@ -889,7 +821,6 @@ p {
   display: none;
 }
 
-/* Footer del Sidebar */
 .sidebar-footer {
   padding: var(--spacing-lg);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -947,7 +878,6 @@ p {
   display: none;
 }
 
-/* Main Content Area */
 .main-wrapper {
   flex: 1;
   margin-left: 260px;
@@ -969,7 +899,6 @@ p {
   margin: 0 auto;
 }
 
-/* Scrollbar del Sidebar */
 .sidebar-nav::-webkit-scrollbar {
   width: 6px;
 }
@@ -991,7 +920,7 @@ p {
    BOTÓN HAMBURGUESA MOBILE
    ======================================== */
 .mobile-menu-toggle {
-  display: none; /* Oculto por defecto en desktop */
+  display: none;
   position: fixed;
   top: 1rem;
   left: 1rem;
@@ -1016,7 +945,6 @@ p {
   transform: scale(0.95);
 }
 
-/* Icono Hamburguesa animado */
 .hamburger {
   display: flex;
   flex-direction: column;
@@ -1036,7 +964,6 @@ p {
   transition: all var(--transition-base);
 }
 
-/* Animación cuando está abierto */
 .hamburger.open span:nth-child(1) {
   transform: translateY(8px) rotate(45deg);
 }
@@ -1049,7 +976,6 @@ p {
   transform: translateY(-8px) rotate(-45deg);
 }
 
-/* Overlay oscuro mobile */
 .mobile-overlay {
   display: none;
   position: fixed;
@@ -1063,43 +989,145 @@ p {
 }
 
 /* ========================================
-   RESPONSIVE SIDEBAR
+   🔥 REACT-HOT-TOAST: CENTRADO EN MOBILE
+   ======================================== */
+
+/* Desktop: Arriba centrado */
+@media (min-width: 769px) {
+  div[class*="Toaster"] {
+    top: 80px !important;
+  }
+}
+
+/* Mobile: CENTRADO VERTICAL */
+@media (max-width: 768px) {
+  div[class*="Toaster"],
+  div[role="region"][aria-live="polite"] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 90% !important;
+    max-width: 360px !important;
+    z-index: 99999 !important;
+    pointer-events: none !important;
+  }
+
+  div[class*="Toaster"] > div {
+    width: 100% !important;
+    pointer-events: auto !important;
+    margin: 0 auto 12px auto !important;
+  }
+
+  div[class*="Toaster"] > div > div {
+    width: 100% !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+    background: white !important;
+  }
+
+  div[class*="Toaster"] > div:has(button) > div {
+    padding: 24px !important;
+    min-height: 160px !important;
+  }
+
+  div[class*="Toaster"] button {
+    font-size: 15px !important;
+    padding: 12px 20px !important;
+    min-width: 100px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    touch-action: manipulation !important;
+  }
+
+  div[class*="Toaster"] p:first-child {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    margin-bottom: 8px !important;
+  }
+
+  div[class*="Toaster"] p:nth-child(2) {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    color: #555 !important;
+    margin-bottom: 16px !important;
+  }
+
+  div[class*="Toaster"] svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  body:has(div[class*="Toaster"]:has(button))::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 99998;
+    animation: fadeInOverlay 0.2s ease-out;
+  }
+
+  body:has(div[class*="Toaster"]:has(button)) {
+    overflow: hidden;
+  }
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  div[class*="Toaster"] button:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+}
+
+body.mobile-menu-open div[class*="Toaster"] {
+  z-index: 100000 !important;
+}
+
+/* ========================================
+   RESPONSIVE GENERAL
    ======================================== */
 @media (max-width: 768px) {
-  /* Mostrar botón hamburguesa en mobile */
   .mobile-menu-toggle {
     display: block;
   }
 
-  /* Mostrar overlay cuando el menú está abierto */
   .mobile-overlay {
     display: block;
   }
 
-  /* Sidebar oculto por defecto en mobile */
   .sidebar {
     width: 280px;
     transform: translateX(-100%);
     box-shadow: none;
   }
 
-  /* Sidebar visible cuando está abierto */
   .sidebar.mobile-open {
     transform: translateX(0);
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
   }
 
-  /* Main content sin margen en mobile */
   .main-wrapper {
     margin-left: 0 !important;
   }
 
-  /* Page content con padding reducido */
   .page-content {
     padding: 5rem var(--spacing-md) var(--spacing-md);
   }
 
-  /* Ajustes de texto en mobile */
   h1 {
     font-size: 1.75rem;
   }
@@ -1108,7 +1136,6 @@ p {
     font-size: 1.5rem;
   }
 
-  /* Formularios en mobile */
   .form-container {
     padding: var(--spacing-lg);
   }
@@ -1117,20 +1144,21 @@ p {
     min-width: 100%;
   }
 
-  /* Cards en mobile */
   .lista-container {
     grid-template-columns: 1fr;
   }
 
-  /* Modal en mobile */
   .modal-content {
     width: 95%;
     padding: var(--spacing-lg);
   }
 
-  /* Tablas en mobile */
   .tabla-detalles {
     font-size: 0.875rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
 
   .tabla-detalles th,
@@ -1138,20 +1166,52 @@ p {
     padding: var(--spacing-sm);
   }
 
-  /* Botones en tablas más pequeños en mobile */
   .btn-editar,
   .btn-eliminar {
     padding: 0.3rem 0.6rem !important;
     font-size: 0.75rem !important;
   }
 
-  /* Ocultar toggle del sidebar en mobile cuando está colapsado */
+  .tabla-acciones {
+    white-space: nowrap;
+  }
+
+  .btn {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
+  }
+
   .sidebar.mobile-open .sidebar-toggle {
     display: block;
   }
+
+  .sidebar-footer {
+    padding: var(--spacing-md);
+  }
+
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 0.8rem;
+  }
+
+  .user-name {
+    font-size: 0.85rem;
+  }
+
+  .user-role {
+    font-size: 0.7rem;
+  }
+
+  body {
+    padding-top: 0;
+  }
+
+  .card {
+    padding: var(--spacing-lg);
+  }
 }
 
-/* Tablet (768px - 1024px) */
 @media (min-width: 769px) and (max-width: 1024px) {
   .sidebar {
     width: 220px;
@@ -1170,60 +1230,57 @@ p {
   }
 }
 
-/* ========================================
-   MEJORAS MOBILE ADICIONALES
-   ======================================== */
-@media (max-width: 768px) {
-  /* Asegurar que el contenido no quede detrás del botón */
-  body {
-    padding-top: 0;
-  }
-
-  /* Mejorar cards en mobile */
-  .card {
-    padding: var(--spacing-lg);
-  }
-
-  /* Mejorar tablas responsivas */
-  .tabla-detalles {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Hacer que las acciones de tabla se vean mejor en mobile */
-  .tabla-acciones {
-    white-space: nowrap;
-  }
-
-  /* Ajustar botones en mobile */
-  .btn {
-    padding: 0.75rem 1.25rem;
-    font-size: 0.9rem;
-  }
-
-  /* Sidebar footer en mobile */
-  .sidebar-footer {
-    padding: var(--spacing-md);
-  }
-
-  .user-avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 0.8rem;
-  }
-
-  .user-name {
-    font-size: 0.85rem;
-  }
-
-  .user-role {
-    font-size: 0.7rem;
-  }
-}
-
-/* Prevenir scroll cuando el menú mobile está abierto */
 body.mobile-menu-open {
   overflow: hidden;
+}
+
+/* ========================================
+   🔥 FORZADO BRUTAL DE TOASTS EN MOBILE
+   ======================================== */
+@media (max-width: 768px) {
+  /* Forzar contenedor de react-hot-toast */
+  [role="region"][aria-live="polite"] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 90vw !important;
+    max-width: 400px !important;
+    z-index: 999999 !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Toasts individuales (clases dinámicas de react-hot-toast) */
+  [role="region"][aria-live="polite"] > div {
+    pointer-events: auto !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+  }
+
+  /* Contenido del toast */
+  [role="status"][aria-live="polite"] {
+    width: 100% !important;
+  }
+
+  /* Overlay oscuro para confirmaciones */
+  body:has([role="region"][aria-live="polite"] button)::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 999998;
+    pointer-events: none;
+  }
+
+  /* Bloquear scroll cuando hay confirmación */
+  body:has([role="region"][aria-live="polite"] button) {
+    overflow: hidden !important;
+  }
 }

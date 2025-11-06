@@ -1,5 +1,3 @@
-// src/pages/Proveedores.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
@@ -15,37 +13,9 @@ import {
   editarPago,
   eliminarPago
 } from '../services/api';
-
-// --- Función para obtener fecha local (sin UTC) ---
-const obtenerFechaLocal = () => {
-  const ahora = new Date();
-  const año = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  return `${año}-${mes}-${dia}`;
-};
-
-// --- Función para formatear fecha sin conversión de zona horaria ---
-const formatearFechaLocal = (fechaString) => {
-  if (!fechaString) return '';
-  const [año, mes, dia] = fechaString.split('T')[0].split('-');
-  return `${dia}/${mes}/${año}`;
-};
-
-// --- Función de ayuda para sumar días ---
-const sumarDias = (fechaString, dias) => {
-  try {
-    const [año, mes, dia] = fechaString.split('-');
-    const fecha = new Date(año, mes - 1, dia);
-    fecha.setDate(fecha.getDate() + dias);
-    const nuevoAño = fecha.getFullYear();
-    const nuevoMes = String(fecha.getMonth() + 1).padStart(2, '0');
-    const nuevoDia = String(fecha.getDate()).padStart(2, '0');
-    return `${nuevoAño}-${nuevoMes}-${nuevoDia}`;
-  } catch (e) {
-    return ''; 
-  }
-};
+import { obtenerFechaLocal, formatearFechaLocal, sumarDias } from '../utils/dateUtils';
+import toast from 'react-hot-toast';
+import { confirmarAccion } from '../utils/confirmUtils.jsx';
 
 
 function Proveedores() {
@@ -97,8 +67,8 @@ function Proveedores() {
       setFacturas(todasLasFacturas);
       setPagos(todosLosPagos);
     } catch (error) {
-      console.error('Error cargando datos:', error);
-      alert('Error al cargar los datos. ¿Está el backend funcionando?');
+      console.error("Error cargando datos:", error);
+      toast.error("Error al cargar los datos. Verifica la conexión.");
     } finally {
       setLoading(false);
     }
@@ -113,14 +83,14 @@ function Proveedores() {
   const handleAgregarProveedor = async (e) => {
     e.preventDefault();
     if (!nombreNuevoProveedor.trim()) return;
-    
+
     try {
       const nuevoProveedor = await crearProveedor(nombreNuevoProveedor.trim());
       setProveedores([...proveedores, nuevoProveedor]);
-      setNombreNuevoProveedor('');
+      setNombreNuevoProveedor("");
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al crear proveedor');
+      console.error("Error:", error);
+      toast.error("Error al crear proveedor");
     }
   };
 
@@ -133,20 +103,25 @@ function Proveedores() {
   };
 
   const handleEliminarProveedor = async (proveedorId) => {
-    const confirmar = window.confirm("¿Estás seguro de eliminar este proveedor? Se borrarán TODAS sus facturas y pagos asociados.");
+    const confirmar = await confirmarAccion({
+      title: "¿Eliminar proveedor?",
+      message: "Se borrarán TODAS sus facturas y pagos asociados.",
+      confirmText: "Eliminar",
+      confirmColor: "#dc3545",
+    });
     if (!confirmar) return;
-    
+
     try {
       await eliminarProveedor(proveedorId);
-      setProveedores(proveedores.filter(p => p._id !== proveedorId));
-      setFacturas(facturas.filter(f => f.proveedorId !== proveedorId));
-      setPagos(pagos.filter(p => p.proveedorId !== proveedorId));
+      setProveedores(proveedores.filter((p) => p._id !== proveedorId));
+      setFacturas(facturas.filter((f) => f.proveedorId !== proveedorId));
+      setPagos(pagos.filter((p) => p.proveedorId !== proveedorId));
       if (proveedorSeleccionado && proveedorSeleccionado._id === proveedorId) {
         setProveedorSeleccionado(null);
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al eliminar proveedor');
+      console.error("Error:", error);
+      toast.error("Error al eliminar proveedor");
     }
   };
 
@@ -155,29 +130,35 @@ function Proveedores() {
     const monto = parseFloat(montoNuevaFactura);
     const rechazo = parseFloat(montoRechazo) || 0;
     const numero = numeroNuevaFactura.trim();
-    if (!monto || monto <= 0 || !numero || !fechaVencimientoNuevaFactura || !proveedorSeleccionado) {
-        alert("Por favor, completa la fecha, vencimiento, N° de factura y el monto.");
-        return;
+    if (
+      !monto ||
+      monto <= 0 ||
+      !numero ||
+      !fechaVencimientoNuevaFactura ||
+      !proveedorSeleccionado
+    ) {
+      toast.error("Completa todos los campos requeridos");
+      return;
     }
     
     try {
-      const nuevaFactura = await agregarFactura(proveedorSeleccionado._id, { 
-        fecha: fechaNuevaFactura, 
+      const nuevaFactura = await agregarFactura(proveedorSeleccionado._id, {
+        fecha: fechaNuevaFactura,
         fechaVencimiento: fechaVencimientoNuevaFactura,
-        numero: numero, 
-        monto: monto, 
-        rechazo: rechazo 
+        numero: numero,
+        monto: monto,
+        rechazo: rechazo,
       });
       setFacturas([...facturas, nuevaFactura]);
-      setNumeroNuevaFactura('');
-      setMontoNuevaFactura('');
-      setMontoRechazo('');
+      setNumeroNuevaFactura("");
+      setMontoNuevaFactura("");
+      setMontoRechazo("");
       const hoy = obtenerFechaLocal();
       setFechaNuevaFactura(hoy);
       setFechaVencimientoNuevaFactura(sumarDias(hoy, 7));
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al agregar factura');
+      console.error("Error:", error);
+      toast.error("Error al agregar factura");
     }
   };
 
@@ -185,44 +166,54 @@ function Proveedores() {
     e.preventDefault();
     const monto = parseFloat(montoNuevoPago);
     if (!monto || monto <= 0 || !proveedorSeleccionado) return;
-    
+
     try {
-      const nuevoPago = await agregarPago(proveedorSeleccionado._id, { 
-        monto: monto, 
-        fecha: fechaNuevoPago 
+      const nuevoPago = await agregarPago(proveedorSeleccionado._id, {
+        monto: monto,
+        fecha: fechaNuevoPago,
       });
       setPagos([...pagos, nuevoPago]);
-      setMontoNuevoPago('');
+      setMontoNuevoPago("");
       setFechaNuevoPago(obtenerFechaLocal());
+      toast.success(`Pago de $${monto.toLocaleString("es-AR")} registrado`); // ← NUEVO
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al agregar pago');
+      console.error("Error:", error);
+      toast.error("Error al agregar pago");
     }
   };
 
   const handleEliminarFactura = async (facturaId) => {
-    const confirmar = window.confirm("¿Estás seguro de que deseas eliminar esta factura? Esta acción no se puede deshacer.");
+    const confirmar = await confirmarAccion({
+      title: "¿Eliminar factura?",
+      message: "Esta acción no se puede deshacer.",
+      confirmText: "Eliminar",
+      confirmColor: "#dc3545",
+    });
     if (!confirmar) return;
     
     try {
       await eliminarFactura(facturaId);
-      setFacturas(facturas.filter(f => f._id !== facturaId));
+      setFacturas(facturas.filter((f) => f._id !== facturaId));
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al eliminar factura');
+      console.error("Error:", error);
+      toast.error("Error al eliminar factura");
     }
   };
   
   const handleEliminarPago = async (pagoId) => {
-    const confirmar = window.confirm("¿Estás seguro de que deseas eliminar este pago?");
+    const confirmar = await confirmarAccion({
+      title: "¿Eliminar pago?",
+      confirmText: "Eliminar",
+      confirmColor: "#dc3545",
+    });
     if (!confirmar) return;
-    
+
     try {
       await eliminarPago(pagoId);
-      setPagos(pagos.filter(p => p._id !== pagoId));
+      setPagos(pagos.filter((p) => p._id !== pagoId));
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al eliminar pago');
+      console.error("Error:", error);
+      toast.error("Error al eliminar pago");
     }
   };
 
@@ -269,7 +260,7 @@ function Proveedores() {
     const rechazo = parseFloat(itemEditando.rechazo) || 0;
     
     if (!monto || monto <= 0 || !itemEditando.numero) {
-      alert("El N° de factura y el Monto no pueden estar vacíos.");
+      toast.error("El N° de factura y el monto son obligatorios");
       return;
     }
     
@@ -279,21 +270,26 @@ function Proveedores() {
         fechaVencimiento: itemEditando.fechaVencimiento || null,
         numero: itemEditando.numero,
         monto,
-        rechazo
+        rechazo,
       });
-      
-      const facturasActualizadas = facturas.map(f => 
-        f._id === itemEditando._id 
-          ? { ...itemEditando, monto, rechazo, fechaVencimiento: itemEditando.fechaVencimiento || null }
+
+      const facturasActualizadas = facturas.map((f) =>
+        f._id === itemEditando._id
+          ? {
+              ...itemEditando,
+              monto,
+              rechazo,
+              fechaVencimiento: itemEditando.fechaVencimiento || null,
+            }
           : f
       );
-      
+
       setFacturas(facturasActualizadas);
       handleCerrarModales();
-      alert('✅ Factura editada correctamente');
+      toast.success("Factura editada correctamente");
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al editar factura');
+      console.error("Error:", error);
+      toast.error("Error al editar factura");
     }
   };
 
@@ -301,27 +297,25 @@ function Proveedores() {
     e.preventDefault();
     const monto = parseFloat(itemEditando.monto);
     if (!monto || monto <= 0) {
-      alert("El Monto no puede estar vacío.");
+      toast.error("El monto debe ser mayor a 0");
       return;
     }
     
     try {
       await editarPago(itemEditando._id, {
         fecha: itemEditando.fecha,
-        monto
+        monto,
       });
-      
-      const pagosActualizados = pagos.map(p => 
-        p._id === itemEditando._id 
-          ? { ...itemEditando, monto } 
-          : p
+
+      const pagosActualizados = pagos.map((p) =>
+        p._id === itemEditando._id ? { ...itemEditando, monto } : p
       );
       setPagos(pagosActualizados);
       handleCerrarModales();
-      alert('✅ Pago editado correctamente');
+      toast.success("Pago editado correctamente");
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al editar pago');
+      console.error("Error:", error);
+      toast.error("Error al editar pago");
     }
   };
   
@@ -413,23 +407,31 @@ function Proveedores() {
     reader.onload = async (e) => {
       try {
         const data = e.target.result;
-        const wb = XLSX.read(data, { type: 'buffer', cellDates: true });
+        const wb = XLSX.read(data, { type: "buffer", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+        const aoa = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          blankrows: false,
+        });
 
         const nuevasFacturas = [];
         const nuevosPagos = [];
 
         for (let i = 1; i < aoa.length; i++) {
           const row = aoa[i];
-          
+
           const fechaFactura = row[0];
           const fechaVencimiento = row[1];
           const numeroFactura = row[2];
           const montoFactura = row[3];
           const rechazoFactura = row[4];
 
-          if (fechaFactura && (typeof montoFactura === 'number' || (typeof montoFactura === 'string' && !isNaN(parseFloat(montoFactura))))) {
+          if (
+            fechaFactura &&
+            (typeof montoFactura === "number" ||
+              (typeof montoFactura === "string" &&
+                !isNaN(parseFloat(montoFactura))))
+          ) {
             const fechaParseada = parsearFecha(fechaFactura);
             if (fechaParseada) {
               nuevasFacturas.push({
@@ -444,7 +446,11 @@ function Proveedores() {
 
           const fechaPago = row[8];
           const montoPago = row[9];
-          if (fechaPago && (typeof montoPago === 'number' || (typeof montoPago === 'string' && !isNaN(parseFloat(montoPago))))) {
+          if (
+            fechaPago &&
+            (typeof montoPago === "number" ||
+              (typeof montoPago === "string" && !isNaN(parseFloat(montoPago))))
+          ) {
             const fechaParseada = parsearFecha(fechaPago);
             if (fechaParseada) {
               nuevosPagos.push({
@@ -454,25 +460,39 @@ function Proveedores() {
             }
           }
         }
-        
-        const confirmar = window.confirm(
-          `Se encontraron ${nuevasFacturas.length} facturas y ${nuevosPagos.length} pagos. ¿Deseas agregarlos a ${proveedorSeleccionado.nombre}?`
-        );
-        
+
+        const confirmar = await confirmarAccion({
+          title: "Importar datos",
+          message: `Se encontraron ${nuevasFacturas.length} facturas y ${nuevosPagos.length} pagos. ¿Importar a ${proveedorSeleccionado.nombre}?`,
+          confirmText: "Importar",
+          confirmColor: "#28a745",
+        });
+
         if (confirmar) {
           for (const factura of nuevasFacturas) {
-            const facturaCreada = await agregarFactura(proveedorSeleccionado._id, factura);
-            setFacturas(facturasActuales => [...facturasActuales, facturaCreada]);
+            const facturaCreada = await agregarFactura(
+              proveedorSeleccionado._id,
+              factura
+            );
+            setFacturas((facturasActuales) => [
+              ...facturasActuales,
+              facturaCreada,
+            ]);
           }
           for (const pago of nuevosPagos) {
-            const pagoCreado = await agregarPago(proveedorSeleccionado._id, pago);
-            setPagos(pagosActuales => [...pagosActuales, pagoCreado]);
+            const pagoCreado = await agregarPago(
+              proveedorSeleccionado._id,
+              pago
+            );
+            setPagos((pagosActuales) => [...pagosActuales, pagoCreado]);
           }
-          alert("¡Datos importados con éxito!");
+          toast.success(
+            `${nuevasFacturas.length} facturas y ${nuevosPagos.length} pagos importados`
+          );
         }
       } catch (error) {
         console.error("Error al leer el archivo de Excel:", error);
-        alert("Hubo un error al leer el archivo. Asegúrate de que tenga el formato A1/I1 que genera la app.");
+        toast.error("Error al leer el archivo. Verifica el formato A1/I1");
       }
     };
     
@@ -547,8 +567,9 @@ function Proveedores() {
           </h3>
           <hr style={{margin: '2rem 0'}} />
 
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '2rem'}}>
-            <div style={{flex: 1, minWidth: '300px'}}>
+          {/* ✅ GRID EN VEZ DE FLEX - EVITA SUPERPOSICIÓN */}
+          <div className="proveedores-tablas-grid">
+            <div style={{minWidth: '300px'}}>
               <h3>Cargar Factura (Deuda)</h3>
               
               <form onSubmit={handleAgregarFactura} className="form-container" style={{flexDirection: 'column'}}>
@@ -609,7 +630,7 @@ function Proveedores() {
               </table>
             </div>
 
-            <div style={{flex: 1, minWidth: '300px'}}>
+            <div style={{minWidth: '300px'}}>
               <h3>Cargar Pago</h3>
               <form onSubmit={handleAgregarPago} className="form-container" style={{flexDirection: 'column'}}>
                 <label>Fecha de Pago</label>

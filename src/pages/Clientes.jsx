@@ -1,5 +1,3 @@
-// src/pages/Clientes.jsx
-
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -11,22 +9,9 @@ import {
   eliminarDeuda,
   editarDeuda,
 } from "../services/api";
-
-// --- Función para obtener fecha local (sin UTC) ---
-const obtenerFechaLocal = () => {
-  const ahora = new Date();
-  const año = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, "0");
-  const dia = String(ahora.getDate()).padStart(2, "0");
-  return `${año}-${mes}-${dia}`;
-};
-
-// --- Función para formatear fecha sin conversión de zona horaria ---
-const formatearFechaLocal = (fechaString) => {
-  if (!fechaString) return '';
-  const [año, mes, dia] = fechaString.split('T')[0].split('-');
-  return `${dia}/${mes}/${año}`;
-};
+import { obtenerFechaLocal, formatearFechaLocal } from "../utils/dateUtils";
+import toast from "react-hot-toast";
+import { confirmarAccion } from '../utils/confirmUtils';
 
 function Clientes() {
   // Estados de la app
@@ -65,7 +50,7 @@ function Clientes() {
       setDeudas(todasLasDeudas);
     } catch (error) {
       console.error("Error cargando datos:", error);
-      alert("Error al cargar los datos. ¿Está el backend funcionando?");
+      toast.error("Error al cargar los datos. Verifica la conexión.");
     } finally {
       setLoading(false);
     }
@@ -75,13 +60,13 @@ function Clientes() {
   const handleAgregarClienteYDeuda = async (e) => {
     e.preventDefault();
     if (!nombreCliente.trim()) {
-      alert("El nombre del cliente es obligatorio");
+      toast.error("El nombre del cliente es obligatorio");
       return;
     }
 
     const monto = parseFloat(montoDeuda);
     if (!monto || monto <= 0) {
-      alert("El monto debe ser mayor a 0");
+      toast.error("El monto debe ser mayor a 0");
       return;
     }
 
@@ -107,14 +92,14 @@ function Clientes() {
       setMontoDeuda("");
       setFechaDeuda(obtenerFechaLocal());
 
-      alert(
-        `${
-          cliente.nombre
-        } agregado/actualizado con deuda de $${monto.toLocaleString("es-AR")}`
+      toast.success(
+        `${cliente.nombre}: Deuda de $${monto.toLocaleString(
+          "es-AR"
+        )} registrada`
       );
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al agregar cliente/deuda");
+      toast.error("Error al agregar cliente/deuda");
     }
   };
 
@@ -130,11 +115,15 @@ function Clientes() {
   );
 
   const handleEliminarCliente = async (clienteId) => {
-    const confirmar = window.confirm(
-      "¿Estás seguro de eliminar este cliente? Se borrarán TODAS sus deudas asociadas."
-    );
-    if (!confirmar) return;
+    const confirmar = await confirmarAccion({
+      title: "¿Eliminar cliente?",
+      message: "Se borrarán TODAS sus deudas asociadas.",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      confirmColor: "#dc3545",
+    });
 
+    if (!confirmar) return;
     try {
       await eliminarCliente(clienteId);
 
@@ -149,12 +138,18 @@ function Clientes() {
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al eliminar cliente");
+      toast.error("Error al eliminar cliente");
     }
   };
 
   const handleEliminarDeuda = async (deudaId) => {
-    const confirmar = window.confirm("¿Estás seguro de eliminar esta deuda?");
+    const confirmar = await confirmarAccion({
+      title: "¿Eliminar esta deuda?",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      confirmColor: "#dc3545",
+    });
+
     if (!confirmar) return;
 
     try {
@@ -163,7 +158,7 @@ function Clientes() {
       setDeudas(nuevasDeudas);
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al eliminar deuda");
+      toast.error("Error al eliminar deuda");
     }
   };
 
@@ -213,7 +208,7 @@ function Clientes() {
     e.preventDefault();
     const monto = parseFloat(itemEditando.monto);
     if (!monto || monto <= 0) {
-      alert("El Monto no puede estar vacío.");
+      toast.error("El monto debe ser mayor a 0");
       return;
     }
 
@@ -226,10 +221,10 @@ function Clientes() {
 
       setDeudas(deudasActualizadas);
       handleCerrarModales();
-      alert("✅ Deuda editada correctamente");
+      toast.success("Deuda editada correctamente");
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al editar deuda");
+      toast.error("Error al editar deuda");
     }
   };
 
@@ -358,9 +353,13 @@ function Clientes() {
           }
         }
 
-        const confirmar = window.confirm(
-          `Se encontraron ${nuevasDeudas.length} deudas. ¿Deseas importarlas?`
-        );
+        const confirmar = await confirmarAccion({
+          title: "Importar deudas",
+          message: `Se encontraron ${nuevasDeudas.length} deudas. ¿Deseas importarlas?`,
+          confirmText: "Importar",
+          cancelText: "Cancelar",
+          confirmColor: "#28a745",
+        });
 
         if (confirmar) {
           for (const deuda of nuevasDeudas) {
@@ -371,12 +370,14 @@ function Clientes() {
             );
             setDeudas((deudasActuales) => [...deudasActuales, deudaCreada]);
           }
-          alert("¡Datos importados con éxito!");
+          toast.success(
+            `${nuevasDeudas.length} deudas importadas correctamente`
+          );
         }
       } catch (error) {
         console.error("Error al leer el archivo de Excel:", error);
-        alert(
-          "Hubo un error al leer el archivo. Asegúrate de que tenga el formato correcto (CLIENTE, FECHA, MONTO)."
+        toast.error(
+          "Error al leer el archivo. Verifica el formato (CLIENTE, FECHA, MONTO)"
         );
       }
     };

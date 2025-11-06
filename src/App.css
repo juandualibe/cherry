@@ -40,3 +40,18 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Grid responsive para Proveedores */
+.proveedores-tablas-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Por defecto: 1 columna */
+  gap: 3rem;
+  margin-bottom: 2rem;
+}
+
+/* En pantallas grandes: 2 columnas lado a lado */
+@media (min-width: 1400px) {
+  .proveedores-tablas-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

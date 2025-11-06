@@ -1,5 +1,3 @@
-// src/pages/OrdenesCompra.jsx
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -8,20 +6,7 @@ import {
   crearOrden,
   eliminarOrden
 } from '../services/api';
-
-const obtenerFechaLocal = () => {
-  const ahora = new Date();
-  const año = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  return `${año}-${mes}-${dia}`;
-};
-
-const formatearFechaLocal = (fechaString) => {
-  if (!fechaString) return '';
-  const [año, mes, dia] = fechaString.split('T')[0].split('-');
-  return `${dia}/${mes}/${año}`;
-};
+import { obtenerFechaLocal, formatearFechaLocal } from '../utils/dateUtils';
 
 function OrdenesCompra() {
   const [ordenes, setOrdenes] = useState([]);

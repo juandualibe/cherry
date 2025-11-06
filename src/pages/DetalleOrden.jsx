@@ -1,6 +1,4 @@
-// src/pages/DetalleOrden.jsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   obtenerOrden,
@@ -11,12 +9,7 @@ import {
   escanearCodigo
 } from '../services/api';
 import EscanerBarras from '../components/EscanerBarras';
-
-const formatearFechaLocal = (fechaString) => {
-  if (!fechaString) return '';
-  const [año, mes, dia] = fechaString.split('T')[0].split('-');
-  return `${dia}/${mes}/${año}`;
-};
+import { formatearFechaLocal } from '../utils/dateUtils';
 
 function DetalleOrden() {
   const { ordenId } = useParams();
@@ -36,9 +29,21 @@ function DetalleOrden() {
   // Estados para escáner
   const [escaneadorAbierto, setEscaneadorAbierto] = useState(false);
   const [ultimoEscaneo, setUltimoEscaneo] = useState(null);
+  const [procesandoEscaneo, setProcesandoEscaneo] = useState(false);
+  
+  // Refs para control de escaneo
+  const ultimoCodigoEscaneado = useRef(null);
+  const timeoutEscaneo = useRef(null);
 
   useEffect(() => {
     cargarDatos();
+    
+    // Cleanup al desmontar
+    return () => {
+      if (timeoutEscaneo.current) {
+        clearTimeout(timeoutEscaneo.current);
+      }
+    };
   }, [ordenId]);
 
   const cargarDatos = async () => {
@@ -124,6 +129,14 @@ function DetalleOrden() {
   };
 
   const handleEscanear = async (codigoBarras) => {
+    // Evitar procesar el mismo código múltiples veces
+    if (procesandoEscaneo || ultimoCodigoEscaneado.current === codigoBarras) {
+      return;
+    }
+
+    setProcesandoEscaneo(true);
+    ultimoCodigoEscaneado.current = codigoBarras;
+
     try {
       const resultado = await escanearCodigo(ordenId, codigoBarras);
       
@@ -144,9 +157,6 @@ function DetalleOrden() {
       const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Lz/LUfjAGGm7A7+OZRQ4PVKrk7q5aGAg+ltryxnMpBSh+zPDajz4KFV627eeXSg0NUKXi8LZmHggykNXwzH4yBh1wwO7mnEgPC1Kn4e+zYBoGNI/U8Mp8MwUdbL/v5Z1LDwxPpeLvtmcdBzKN0/DLfDQGHm2+7uScTBAMTqPh8LhnHwcxjNLwyH02Bx9rv+7km04QDE+k4O+2aB8HMIrP8Md+Nwgfar3t5JxPEAxOpN/vt2kgCDCJzvDHfjcIH2m77OScUBALTaPf77dpIQgviM3vxn45CB9ou+zknFARC0yi3u+4aiIILofM78Z/Ogkfabvs5ZxRDw==');
       audio.play().catch(e => console.log('Audio no disponible'));
       
-      // Limpiar mensaje después de 3 segundos
-      setTimeout(() => setUltimoEscaneo(null), 3000);
-      
       // Recargar orden para actualizar totales
       const ordenActualizada = await obtenerOrden(ordenId);
       setOrden(ordenActualizada);
@@ -164,9 +174,21 @@ function DetalleOrden() {
       // Reproducir sonido de error
       const audioError = new Audio('data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//');
       audioError.play().catch(e => console.log('Audio no disponible'));
+    } finally {
+      // Limpiar mensaje después de 2 segundos
+      if (timeoutEscaneo.current) {
+        clearTimeout(timeoutEscaneo.current);
+      }
       
-      // Limpiar mensaje después de 3 segundos
-      setTimeout(() => setUltimoEscaneo(null), 3000);
+      timeoutEscaneo.current = setTimeout(() => {
+        setUltimoEscaneo(null);
+        ultimoCodigoEscaneado.current = null;
+      }, 2000);
+      
+      // Permitir escanear de nuevo después de 2 segundos
+      setTimeout(() => {
+        setProcesandoEscaneo(false);
+      }, 2000);
     }
   };
 
@@ -427,8 +449,7 @@ function DetalleOrden() {
               backgroundColor: ultimoEscaneo.tipo === 'success' ? '#d4edda' : '#f8d7da',
               color: ultimoEscaneo.tipo === 'success' ? '#155724' : '#721c24',
               border: `3px solid ${ultimoEscaneo.tipo === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              animation: 'pulse 0.5s ease'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
             }}>
               {ultimoEscaneo.tipo === 'success' ? '✅' : '❌'} {ultimoEscaneo.mensaje}
               {ultimoEscaneo.codigo && (
@@ -463,7 +484,6 @@ function DetalleOrden() {
             <EscanerBarras
               onScan={(codigo) => {
                 handleEscanear(codigo);
-                // No cerramos el escáner para poder seguir escaneando
               }}
               onClose={() => setEscaneadorAbierto(false)}
             />
