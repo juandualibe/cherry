@@ -4,44 +4,36 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 function EscanerBarras({ onScan, onClose }) {
-  const html5QrCodeRef = useRef(null);
+  const scannerRef = useRef(null);
   const [error, setError] = useState('');
   const [ultimoMensaje, setUltimoMensaje] = useState('');
   const ultimoCodigoProcesado = useRef(null);
   const timeoutProcesamiento = useRef(null);
-  const montadoRef = useRef(false);
+  const inicializadoRef = useRef(false);
 
   useEffect(() => {
-    // Evitar doble inicialización (React StrictMode)
-    if (montadoRef.current) return;
-    montadoRef.current = true;
+    if (inicializadoRef.current) return;
+    inicializadoRef.current = true;
 
     const iniciarEscaner = async () => {
       try {
-        const html5QrCode = new Html5Qrcode("reader");
-        html5QrCodeRef.current = html5QrCode;
+        const scanner = new Html5Qrcode("reader");
+        scannerRef.current = scanner;
         
-        const config = {
-          fps: 15,
-          qrbox: { width: 280, height: 180 },
-          aspectRatio: 1.777778,
-          disableFlip: false
-        };
-
-        await html5QrCode.start(
+        await scanner.start(
           { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            if (ultimoCodigoProcesado.current === decodedText) {
-              return;
-            }
+          {
+            fps: 15,
+            qrbox: { width: 280, height: 180 },
+            aspectRatio: 1.777778
+          },
+          (codigo) => {
+            if (ultimoCodigoProcesado.current === codigo) return;
 
-            ultimoCodigoProcesado.current = decodedText;
-            setUltimoMensaje(`✓ Escaneado: ${decodedText.substring(0, 13)}`);
+            ultimoCodigoProcesado.current = codigo;
+            setUltimoMensaje(`✓ Escaneado: ${codigo.substring(0, 13)}`);
 
-            if (onScan) {
-              onScan(decodedText);
-            }
+            if (onScan) onScan(codigo);
 
             if (timeoutProcesamiento.current) {
               clearTimeout(timeoutProcesamiento.current);
@@ -52,11 +44,11 @@ function EscanerBarras({ onScan, onClose }) {
               setUltimoMensaje('');
             }, 2000);
           },
-          () => {} // Error silencioso
+          () => {} // Ignorar errores de escaneo
         );
       } catch (err) {
-        console.error("Error al iniciar escáner:", err);
-        setError('No se pudo acceder a la cámara. Verifica los permisos.');
+        console.error("Error al iniciar:", err);
+        setError('No se pudo acceder a la cámara');
       }
     };
 
@@ -67,28 +59,22 @@ function EscanerBarras({ onScan, onClose }) {
         clearTimeout(timeoutProcesamiento.current);
       }
       
-      if (html5QrCodeRef.current) {
-        try {
-          html5QrCodeRef.current.stop().catch(() => {});
-          html5QrCodeRef.current = null;
-        } catch (e) {}
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
       }
-      montadoRef.current = false;
+      inicializadoRef.current = false;
     };
-  }, [onScan]);
+  }, []);
 
   const handleClose = () => {
-    if (html5QrCodeRef.current) {
-      try {
-        html5QrCodeRef.current.stop()
-          .catch(() => {})
-          .finally(() => {
-            html5QrCodeRef.current = null;
-            onClose();
-          });
-      } catch (e) {
-        onClose();
-      }
+    if (scannerRef.current) {
+      scannerRef.current.stop()
+        .catch(() => {})
+        .finally(() => {
+          scannerRef.current = null;
+          onClose();
+        });
     } else {
       onClose();
     }
@@ -126,7 +112,6 @@ function EscanerBarras({ onScan, onClose }) {
         <div style={{
           padding: '1rem',
           borderBottom: '2px solid #e0e0e0',
-          flexShrink: 0,
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white'
         }}>
@@ -141,8 +126,7 @@ function EscanerBarras({ onScan, onClose }) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 0
+          justifyContent: 'center'
         }}>
           {error && (
             <div style={{
@@ -151,7 +135,6 @@ function EscanerBarras({ onScan, onClose }) {
               color: '#721c24',
               borderRadius: '8px',
               marginBottom: '1rem',
-              fontSize: '0.85rem',
               width: '100%',
               textAlign: 'center'
             }}>
@@ -166,7 +149,7 @@ function EscanerBarras({ onScan, onClose }) {
               borderRadius: '12px',
               overflow: 'hidden',
               marginBottom: '0.75rem',
-              border: '3px solid #667eea'
+              border: '3px solid #28a745'
             }}
           ></div>
 
@@ -189,18 +172,17 @@ function EscanerBarras({ onScan, onClose }) {
           <p style={{ 
             textAlign: 'center', 
             color: '#666', 
-            fontSize: '0.8rem',
-            margin: '0.25rem 0',
-            lineHeight: '1.4'
+            fontSize: '0.85rem',
+            margin: '0.5rem 0',
+            fontWeight: '600'
           }}>
-            🎯 Centra el código de barras en el cuadro
+            🎯 Centra el código y se escaneará automáticamente
           </p>
         </div>
 
         <div style={{
           padding: '1rem',
-          borderTop: '2px solid #e0e0e0',
-          flexShrink: 0
+          borderTop: '2px solid #e0e0e0'
         }}>
           <button 
             onClick={handleClose}
@@ -210,13 +192,10 @@ function EscanerBarras({ onScan, onClose }) {
               width: '100%',
               padding: '0.75rem',
               fontSize: '1rem',
-              fontWeight: '600',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
+              fontWeight: '600'
             }}
           >
-            ✕ Cerrar
+            ✕ Cerrar Escáner
           </button>
         </div>
       </div>
