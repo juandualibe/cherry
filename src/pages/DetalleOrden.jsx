@@ -124,51 +124,52 @@ function DetalleOrden() {
     }
   };
 
-  const handleEscanear = async (codigoBarras) => {
-    // Ya no necesitamos 'procesandoEscaneo' o 'ultimoCodigoEscaneado'.
-    // El componente EscanerBarras ya tiene un debounce.
-    // Simplemente mostramos 'loading' y procesamos la API.
+  // REEMPLAZA OTRA VEZ la función handleEscanear con esta:
 
+  const handleEscanear = async (codigoBarras) => {
     const loadingToastId = toast.loading("Procesando código...");
 
     try {
       const resultado = await escanearCodigo(ordenId, codigoBarras);
 
-      // 2. Actualizar el producto en la lista
       const productosActualizados = productos.map((p) =>
         p._id === resultado.producto._id ? resultado.producto : p
       );
       setProductos(productosActualizados);
 
-      // 3. Mostrar mensaje de éxito
       toast.success(resultado.mensaje, { id: loadingToastId });
 
-      // Reproducir sonido de éxito
       const audio = new Audio(
         "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Lz/LUfjAGGm7A7+OZRQ4PVKrk7q5aGAg+ltryxnMpBSh+zPDajz4KFV627eeXSg0NUKXi8LZmHggykNXwzH4yBh1wwO7mnEgPC1Kn4e+zYBoGNI/U8Mp8MwUdbL/v5Z1LDwxPpeLvtmcdBzKN0/DLfDQGHm2+7uScTBAMTqPh8LhnHwcxjNLwyH02Bx9rv+7km04QDE+k4O+2aB8HMIrP8Md+Nwgfar3t5JxPEAxOpN/vt2kgCDCJzvDHfjcIH2m77OScUBALTaPf77dpIQgviM3vxn45CB9ou+zknFARC0yi3u+4aiIILofM78Z/Ogkfabvs5ZxRDw=="
       );
       audio.play().catch((e) => console.log("Audio no disponible"));
 
-      // Recargar orden para actualizar totales
       const ordenActualizada = await obtenerOrden(ordenId);
       setOrden(ordenActualizada);
     } catch (error) {
       console.error("Error al escanear:", error);
 
-      // 4. Mostrar alerta de error
-      toast.error(error.error || `Código ${codigoBarras} no encontrado`, {
-        id: loadingToastId,
-        duration: 3000, // Dar un poco más de tiempo para leer el error
-      });
+      // ======================================================
+      // ¡AQUÍ ESTÁ EL CAMBIO IMPORTANTE!
+      // 1. Buscamos un mensaje específico en 'error.mensaje' (probable)
+      // 2. Si no, buscamos en 'error.error' (por si acaso)
+      // 3. Si no, usamos el genérico para "código no encontrado"
+      const mensajeError =
+        error.mensaje ||
+        error.error ||
+        `Código ${codigoBarras} no encontrado en la orden`;
 
-      // Reproducir sonido de error
+      toast.error(mensajeError, {
+        id: loadingToastId,
+        duration: 3000,
+      });
+      // ======================================================
+
       const audioError = new Audio(
         "data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//"
       );
       audioError.play().catch((e) => console.log("Audio no disponible"));
     }
-    // ¡No hay 'finally' ni 'setTimeouts'!
-    // Estamos listos para el siguiente escaneo de inmediato.
   };
 
   const calcularProgreso = () => {
