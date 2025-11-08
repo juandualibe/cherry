@@ -126,8 +126,46 @@ function DetalleOrden() {
 
   // REEMPLAZA OTRA VEZ la función handleEscanear con esta:
 
+  // REEMPLAZA OTRA VEZ la función handleEscanear con esta:
+
   const handleEscanear = async (codigoBarras) => {
-    const loadingToastId = toast.loading("Procesando código...");
+    // --- INICIO DE VALIDACIÓN FRONTEND ---
+
+    // 1. Buscar el producto en el estado local
+    const productoLocal = productos.find(
+      (p) => p.codigoBarras === codigoBarras
+    );
+
+    // 2. Si el producto NO está en la orden
+    if (!productoLocal) {
+      const mensajeError = `Código ${codigoBarras} no encontrado en la orden`;
+      toast.error(mensajeError, { duration: 3000 });
+
+      const audioError = new Audio(
+        "data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//"
+      );
+      audioError.play().catch((e) => console.log("Audio no disponible"));
+      return; // Detener ejecución
+    }
+
+    // 3. Si el producto YA ALCANZÓ la cantidad pedida
+    if (productoLocal.cantidadRecibida >= productoLocal.cantidadPedida) {
+      const mensajeError = `Cantidad máxima alcanzada para: ${productoLocal.nombre}`;
+      toast.error(mensajeError, { duration: 3000 });
+
+      const audioError = new Audio(
+        "data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//"
+      );
+      audioError.play().catch((e) => console.log("Audio no disponible"));
+      return; // Detener ejecución
+    }
+
+    // --- FIN DE VALIDACIÓN ---
+
+    // Si pasó las validaciones, llamamos a la API
+    const loadingToastId = toast.loading(
+      `Agregando ${productoLocal.nombre}...`
+    );
 
     try {
       const resultado = await escanearCodigo(ordenId, codigoBarras);
@@ -137,6 +175,7 @@ function DetalleOrden() {
       );
       setProductos(productosActualizados);
 
+      // El 'resultado.mensaje' del backend (ej: "Producto X (3/10)")
       toast.success(resultado.mensaje, { id: loadingToastId });
 
       const audio = new Audio(
@@ -147,23 +186,17 @@ function DetalleOrden() {
       const ordenActualizada = await obtenerOrden(ordenId);
       setOrden(ordenActualizada);
     } catch (error) {
+      // Este catch ahora solo se activará si la API falla de verdad
+      // (ej: se cae el servidor, o el backend SÍ devuelve un error 400)
       console.error("Error al escanear:", error);
 
-      // ======================================================
-      // ¡AQUÍ ESTÁ EL CAMBIO IMPORTANTE!
-      // 1. Buscamos un mensaje específico en 'error.mensaje' (probable)
-      // 2. Si no, buscamos en 'error.error' (por si acaso)
-      // 3. Si no, usamos el genérico para "código no encontrado"
       const mensajeError =
-        error.mensaje ||
-        error.error ||
-        `Código ${codigoBarras} no encontrado en la orden`;
+        error.mensaje || error.error || `Error procesando el producto`;
 
       toast.error(mensajeError, {
         id: loadingToastId,
         duration: 3000,
       });
-      // ======================================================
 
       const audioError = new Audio(
         "data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//"
