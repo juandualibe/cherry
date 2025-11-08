@@ -13,23 +13,23 @@ function EscanerBarras({ onScan, onClose }) {
 
   // components/EscanerBarras.jsx
 
+  // components/EscanerBarras.jsx
+
   useEffect(() => {
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
 
     // --- INICIO DEL CAMBIO ---
 
-    // 1. Define una función para un qrbox flexible
+    // 1. Define una función para un QRBOX CUADRADO
     const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
-      // Queremos un rectángulo ancho, ideal para códigos de barras.
-      // Usamos el 85% del ancho de la vista.
-      const qrboxWidth = Math.floor(viewfinderWidth * 0.85);
+      // Usaremos un cuadrado basado en la dimensión más pequeña
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       
-      // La altura puede ser menor, 30% del alto es suficiente
-      // para capturar el código completo.
-      const qrboxHeight = Math.floor(viewfinderHeight * 0.3);
+      // Un 70% del borde más corto es un buen tamaño
+      const size = Math.floor(minEdge * 0.70);
       
-      return { width: qrboxWidth, height: qrboxHeight };
+      return { width: size, height: size };
     };
 
     // --- FIN DEL CAMBIO ---
@@ -44,12 +44,12 @@ function EscanerBarras({ onScan, onClose }) {
           {
             fps: 15,
             
-            // --- INICIO DEL CAMBIO ---
-            // 2. Reemplaza el objeto fijo por la función
+            // 2. Usamos la nueva función de caja cuadrada
             qrbox: qrboxFunction,
-            // --- FIN DEL CAMBIO ---
             
-            aspectRatio: 1.777778
+            // Desactivamos 'aspectRatio' para que el video llene el espacio
+            // (esto a veces ayuda con el enfoque)
+            // aspectRatio: 1.777778 
           },
           (codigo) => {
             if (ultimoCodigoProcesado.current === codigo) return;
@@ -66,7 +66,7 @@ function EscanerBarras({ onScan, onClose }) {
             timeoutProcesamiento.current = setTimeout(() => {
               ultimoCodigoProcesado.current = null;
               setUltimoMensaje('');
-            }, 500); // Mantenemos el debounce de 500ms
+            }, 500); 
           },
           () => {} // Ignorar errores de escaneo
         );
@@ -89,7 +89,7 @@ function EscanerBarras({ onScan, onClose }) {
       }
       inicializadoRef.current = false;
     };
-  }, []); // El array de dependencias sigue vacío
+  }, []);
 
   const handleClose = () => {
     if (scannerRef.current) {
