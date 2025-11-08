@@ -11,21 +11,45 @@ function EscanerBarras({ onScan, onClose }) {
   const timeoutProcesamiento = useRef(null);
   const inicializadoRef = useRef(false);
 
+  // components/EscanerBarras.jsx
+
   useEffect(() => {
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
+
+    // --- INICIO DEL CAMBIO ---
+
+    // 1. Define una función para un qrbox flexible
+    const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
+      // Queremos un rectángulo ancho, ideal para códigos de barras.
+      // Usamos el 85% del ancho de la vista.
+      const qrboxWidth = Math.floor(viewfinderWidth * 0.85);
+      
+      // La altura puede ser menor, 30% del alto es suficiente
+      // para capturar el código completo.
+      const qrboxHeight = Math.floor(viewfinderHeight * 0.3);
+      
+      return { width: qrboxWidth, height: qrboxHeight };
+    };
+
+    // --- FIN DEL CAMBIO ---
 
     const iniciarEscaner = async () => {
       try {
         const scanner = new Html5Qrcode("reader");
         scannerRef.current = scanner;
-
+        
         await scanner.start(
           { facingMode: "environment" },
           {
             fps: 15,
-            qrbox: { width: 280, height: 180 },
-            aspectRatio: 1.777778,
+            
+            // --- INICIO DEL CAMBIO ---
+            // 2. Reemplaza el objeto fijo por la función
+            qrbox: qrboxFunction,
+            // --- FIN DEL CAMBIO ---
+            
+            aspectRatio: 1.777778
           },
           (codigo) => {
             if (ultimoCodigoProcesado.current === codigo) return;
@@ -38,17 +62,17 @@ function EscanerBarras({ onScan, onClose }) {
             if (timeoutProcesamiento.current) {
               clearTimeout(timeoutProcesamiento.current);
             }
-
+            
             timeoutProcesamiento.current = setTimeout(() => {
               ultimoCodigoProcesado.current = null;
-              setUltimoMensaje("");
-            }, 500); // <-- ¡CAMBIADO A 500ms!
+              setUltimoMensaje('');
+            }, 500); // Mantenemos el debounce de 500ms
           },
           () => {} // Ignorar errores de escaneo
         );
       } catch (err) {
         console.error("Error al iniciar:", err);
-        setError("No se pudo acceder a la cámara");
+        setError('No se pudo acceder a la cámara');
       }
     };
 
@@ -58,14 +82,14 @@ function EscanerBarras({ onScan, onClose }) {
       if (timeoutProcesamiento.current) {
         clearTimeout(timeoutProcesamiento.current);
       }
-
+      
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
         scannerRef.current = null;
       }
       inicializadoRef.current = false;
     };
-  }, []);
+  }, []); // El array de dependencias sigue vacío
 
   const handleClose = () => {
     if (scannerRef.current) {
