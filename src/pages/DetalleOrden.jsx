@@ -29,21 +29,10 @@ function DetalleOrden() {
 
   // Estados para escáner
   const [escaneadorAbierto, setEscaneadorAbierto] = useState(false);
-  const [procesandoEscaneo, setProcesandoEscaneo] = useState(false);
 
-  // Refs para control de escaneo
-  const ultimoCodigoEscaneado = useRef(null);
-  const timeoutEscaneo = useRef(null);
-
+  // CÓDIGO NUEVO (simplificado)
   useEffect(() => {
     cargarDatos();
-
-    // Cleanup al desmontar
-    return () => {
-      if (timeoutEscaneo.current) {
-        clearTimeout(timeoutEscaneo.current);
-      }
-    };
   }, [ordenId]);
 
   const cargarDatos = async () => {
@@ -135,18 +124,11 @@ function DetalleOrden() {
     }
   };
 
-  // REEMPLAZA la función handleEscanear con esta:
-
   const handleEscanear = async (codigoBarras) => {
-    // Evitar procesar el mismo código múltiples veces
-    if (procesandoEscaneo || ultimoCodigoEscaneado.current === codigoBarras) {
-      return;
-    }
+    // Ya no necesitamos 'procesandoEscaneo' o 'ultimoCodigoEscaneado'.
+    // El componente EscanerBarras ya tiene un debounce.
+    // Simplemente mostramos 'loading' y procesamos la API.
 
-    setProcesandoEscaneo(true);
-    ultimoCodigoEscaneado.current = codigoBarras;
-
-    // 1. Mostrar toast de carga
     const loadingToastId = toast.loading("Procesando código...");
 
     try {
@@ -174,7 +156,6 @@ function DetalleOrden() {
       console.error("Error al escanear:", error);
 
       // 4. Mostrar alerta de error
-      // Usamos el mensaje de error de la API (error.error) o uno genérico
       toast.error(error.error || `Código ${codigoBarras} no encontrado`, {
         id: loadingToastId,
         duration: 3000, // Dar un poco más de tiempo para leer el error
@@ -185,21 +166,9 @@ function DetalleOrden() {
         "data:audio/wav;base64,UklGRhQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YfACAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//"
       );
       audioError.play().catch((e) => console.log("Audio no disponible"));
-    } finally {
-      // Limpiar mensaje después de 2 segundos
-      if (timeoutEscaneo.current) {
-        clearTimeout(timeoutEscaneo.current);
-      }
-
-      // Mantenemos el debounce de 2 segundos para evitar escaneos accidentales
-      timeoutEscaneo.current = setTimeout(() => {
-        ultimoCodigoEscaneado.current = null;
-      }, 2000);
-
-      setTimeout(() => {
-        setProcesandoEscaneo(false);
-      }, 2000);
     }
+    // ¡No hay 'finally' ni 'setTimeouts'!
+    // Estamos listos para el siguiente escaneo de inmediato.
   };
 
   const calcularProgreso = () => {
