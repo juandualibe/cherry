@@ -34,13 +34,16 @@ function Proveedores() {
   const [montoRechazo, setMontoRechazo] = useState('');
   const [montoNuevoPago, setMontoNuevoPago] = useState('');
   const [fechaNuevoPago, setFechaNuevoPago] = useState(obtenerFechaLocal());
-
   const [fechaVencimientoNuevaFactura, setFechaVencimientoNuevaFactura] = useState(() => sumarDias(obtenerFechaLocal(), 7));
 
   // Estados para los modales de edición
   const [modalFacturaAbierto, setModalFacturaAbierto] = useState(false);
   const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
+
+  // Estados para los modales de CREACIÓN
+  const [modalFacturaNuevaAbierto, setModalFacturaNuevaAbierto] = useState(false);
+  const [modalPagoNuevoAbierto, setModalPagoNuevoAbierto] = useState(false);
 
   const mouseDownInsideModal = useRef(false);
 
@@ -55,7 +58,6 @@ function Proveedores() {
       const proveedoresData = await obtenerProveedores();
       setProveedores(proveedoresData);
 
-      // Cargar todas las facturas y pagos de todos los proveedores
       const todasLasFacturas = [];
       const todosLosPagos = [];
       for (const proveedor of proveedoresData) {
@@ -156,6 +158,10 @@ function Proveedores() {
       const hoy = obtenerFechaLocal();
       setFechaNuevaFactura(hoy);
       setFechaVencimientoNuevaFactura(sumarDias(hoy, 7));
+      
+      handleCerrarModales();
+      toast.success("Factura agregada");
+
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al agregar factura");
@@ -175,7 +181,10 @@ function Proveedores() {
       setPagos([...pagos, nuevoPago]);
       setMontoNuevoPago("");
       setFechaNuevoPago(obtenerFechaLocal());
-      toast.success(`Pago de $${monto.toLocaleString("es-AR")} registrado`); // ← NUEVO
+      
+      handleCerrarModales();
+      toast.success(`Pago de $${monto.toLocaleString("es-AR")} registrado`);
+
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al agregar pago");
@@ -222,6 +231,9 @@ function Proveedores() {
     setModalPagoAbierto(false);
     setItemEditando(null);
     mouseDownInsideModal.current = false;
+    
+    setModalFacturaNuevaAbierto(false);
+    setModalPagoNuevoAbierto(false);
   };
 
   const handleAbrirModalFactura = (factura) => {
@@ -567,22 +579,20 @@ function Proveedores() {
           </h3>
           <hr style={{margin: '2rem 0'}} />
 
-          {/* ✅ GRID EN VEZ DE FLEX - EVITA SUPERPOSICIÓN */}
           <div className="proveedores-tablas-grid">
-            <div style={{minWidth: '300px'}}>
-              <h3>Cargar Factura (Deuda)</h3>
+            
+            {/* === COLUMNA 1: FACTURAS === */}
+            <div style={{minWidth: '300px', marginBottom: '2.5rem'}}>
               
-              <form onSubmit={handleAgregarFactura} className="form-container" style={{flexDirection: 'column'}}>
-                <label>Fecha de Factura</label>
-                <input type="date" value={fechaNuevaFactura} onChange={(e) => setFechaNuevaFactura(e.target.value)} />
-                <label>Fecha de Vencimiento (auto 7 días)</label>
-                <input type="date" value={fechaVencimientoNuevaFactura} onChange={(e) => setFechaVencimientoNuevaFactura(e.target.value)} />
-                
-                <input type="text" value={numeroNuevaFactura} onChange={(e) => setNumeroNuevaFactura(e.target.value)} placeholder="N° de Factura" />
-                <input type="number" step="0.01" min="0" value={montoNuevaFactura} onChange={(e) => setMontoNuevaFactura(e.target.value)} placeholder="Monto de la factura" />
-                <input type="number" step="0.01" min="0" value={montoRechazo} onChange={(e) => setMontoRechazo(e.target.value)} placeholder="Monto Rechazo (si aplica)" />
-                <button type="submit" className="btn">Agregar Factura</button>
-              </form>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                <h3 style={{margin: 0}}>Facturas (Deudas)</h3>
+                <button 
+                  className="btn" 
+                  onClick={() => setModalFacturaNuevaAbierto(true)}
+                >
+                  + Nueva Factura
+                </button>
+              </div>
               
               <table className="tabla-detalles">
                 <thead>
@@ -630,14 +640,19 @@ function Proveedores() {
               </table>
             </div>
 
+            {/* === COLUMNA 2: PAGOS === */}
             <div style={{minWidth: '300px'}}>
-              <h3>Cargar Pago</h3>
-              <form onSubmit={handleAgregarPago} className="form-container" style={{flexDirection: 'column'}}>
-                <label>Fecha de Pago</label>
-                <input type="date" value={fechaNuevoPago} onChange={(e) => setFechaNuevoPago(e.target.value)} />
-                <input type="number" step="0.01" min="0" value={montoNuevoPago} onChange={(e) => setMontoNuevoPago(e.target.value)} placeholder="Monto del pago" />
-                <button type="submit" className="btn" style={{backgroundColor: '#5cb85c'}}>Agregar Pago</button>
-              </form>
+
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                <h3 style={{margin: 0}}>Pagos</h3>
+                <button 
+                  className="btn" 
+                  style={{backgroundColor: '#5cb85c'}} 
+                  onClick={() => setModalPagoNuevoAbierto(true)}
+                >
+                  + Nuevo Pago
+                </button>
+              </div>
               
               <table className="tabla-detalles">
                 <thead>
@@ -682,6 +697,63 @@ function Proveedores() {
         </div>
       )}
 
+      {/* --- MODAL PARA NUEVA FACTURA --- */}
+      {modalFacturaNuevaAbierto && (
+        <div 
+          className="modal-overlay" 
+          onMouseDown={handleOverlayMouseDown}
+          onClick={handleOverlayClick}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Cargar Nueva Factura</h2>
+            <form onSubmit={handleAgregarFactura} className="form-container" style={{flexDirection: 'column'}}>
+              <label>Fecha de Factura</label>
+              <input type="date" value={fechaNuevaFactura} onChange={(e) => setFechaNuevaFactura(e.target.value)} />
+              
+              <label>Fecha de Vencimiento</label>
+              <input type="date" value={fechaVencimientoNuevaFactura} onChange={(e) => setFechaVencimientoNuevaFactura(e.target.value)} />
+
+              <label>N° Factura</label>
+              <input type="text" value={numeroNuevaFactura} onChange={(e) => setNumeroNuevaFactura(e.target.value)} placeholder="N° de Factura" />
+              <label>Monto</label>
+              <input type="number" step="0.01" min="0" value={montoNuevaFactura} onChange={(e) => setMontoNuevaFactura(e.target.value)} placeholder="Monto de la factura" />
+              <label>Rechazo (opcional)</label>
+              <input type="number" step="0.01" min="0" value={montoRechazo} onChange={(e) => setMontoRechazo(e.target.value)} placeholder="Monto Rechazo (si aplica)" />
+              
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={handleCerrarModales} style={{backgroundColor: '#6c757d'}}>Cancelar</button>
+                <button type="submit" className="btn">Agregar Factura</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL PARA NUEVO PAGO --- */}
+      {modalPagoNuevoAbierto && (
+        <div 
+          className="modal-overlay" 
+          onMouseDown={handleOverlayMouseDown}
+          onClick={handleOverlayClick}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Cargar Nuevo Pago</h2>
+            <form onSubmit={handleAgregarPago} className="form-container" style={{flexDirection: 'column'}}>
+              <label>Fecha de Pago</label>
+              <input type="date" value={fechaNuevoPago} onChange={(e) => setFechaNuevoPago(e.target.value)} />
+              <label>Monto</label>
+              <input type="number" step="0.01" min="0" value={montoNuevoPago} onChange={(e) => setMontoNuevoPago(e.target.value)} placeholder="Monto del pago" />
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={handleCerrarModales} style={{backgroundColor: '#6c757d'}}>Cancelar</button>
+                <button type="submit" className="btn" style={{backgroundColor: '#5cb85c'}}>Agregar Pago</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* --- MODAL PARA EDITAR FACTURA --- */}
       {modalFacturaAbierto && itemEditando && (
         <div 
           className="modal-overlay" 
@@ -712,6 +784,7 @@ function Proveedores() {
         </div>
       )}
 
+      {/* --- MODAL PARA EDITAR PAGO --- */}
       {modalPagoAbierto && itemEditando && (
         <div 
           className="modal-overlay" 

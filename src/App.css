@@ -41,7 +41,7 @@
   color: #888;
 }
 
-/* Grid responsive para Proveedores */
+/* DEJA SOLO ESTO, BORRA LO QUE TE DI ANTES */
 .proveedores-tablas-grid {
   display: grid;
   grid-template-columns: 1fr; /* Por defecto: 1 columna */
