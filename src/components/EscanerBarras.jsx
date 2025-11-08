@@ -15,24 +15,11 @@ function EscanerBarras({ onScan, onClose }) {
 
   // components/EscanerBarras.jsx
 
+// components/EscanerBarras.jsx
+
   useEffect(() => {
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
-
-    // --- INICIO DEL CAMBIO ---
-
-    // 1. Define una función para un QRBOX CUADRADO
-    const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
-      // Usaremos un cuadrado basado en la dimensión más pequeña
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      
-      // Un 70% del borde más corto es un buen tamaño
-      const size = Math.floor(minEdge * 0.70);
-      
-      return { width: size, height: size };
-    };
-
-    // --- FIN DEL CAMBIO ---
 
     const iniciarEscaner = async () => {
       try {
@@ -42,14 +29,12 @@ function EscanerBarras({ onScan, onClose }) {
         await scanner.start(
           { facingMode: "environment" },
           {
-            fps: 15,
+            fps: 10, // Bajamos los FPS un poco para compensar el área de escaneo
             
-            // 2. Usamos la nueva función de caja cuadrada
-            qrbox: qrboxFunction,
-            
-            // Desactivamos 'aspectRatio' para que el video llene el espacio
-            // (esto a veces ayuda con el enfoque)
-            // aspectRatio: 1.777778 
+            // --- INICIO DEL CAMBIO ---
+            // ¡HEMOS ELIMINADO LA PROPIEDAD 'qrbox' POR COMPLETO!
+            // La librería ahora usará el 100% del visor.
+            // --- FIN DEL CAMBIO ---
           },
           (codigo) => {
             if (ultimoCodigoProcesado.current === codigo) return;
